@@ -82,7 +82,14 @@ async def get_dataset(dataset_id: int, db: Session = Depends(get_db)):
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
 
-    data_preview = await get_data_preview(dataset.file_path, dataset.file_type)
+    if not os.path.exists(dataset.file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    try:
+        data_preview = await get_data_preview(dataset.file_path, dataset.file_type)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load dataset preview: {str(e)}")
+
     result = dataset.to_dict()
     result['data_preview'] = data_preview
     return result

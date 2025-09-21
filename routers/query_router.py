@@ -1,27 +1,50 @@
-from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
+from typing import List
+import os
 import pandas as pd
+from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
+from sqlalchemy.orm import Session
+from sqlalchemy import inspect, text
+from werkzeug.utils import secure_filename
 from extensions import get_db, engine
 from models import Dataset
+from utils import load_dataset, get_data_preview
 
-# This must be named 'router'
 router = APIRouter()
 
-@router.get("/dataset/{dataset_id}/view")
-async def view_dataset(dataset_id: int, db: Session = Depends(get_db), limit: int = 100):
-    dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
-    if not dataset:
-        raise HTTPException(status_code=404, detail="Dataset not found")
 
-    table_name = dataset.name.replace(" ", "_").lower()
+@router.get("/tables")
+async def list_tables():
+    """Return all available tables in SQLite."""
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+    return {"tables": tables, "total": len(tables)}
+
+@router.get("/preview/{table_name}")
+async def preview_table(table_name: str, limit: int = 10):
+    """Preview the first rows of a table."""
     try:
         df = pd.read_sql(f"SELECT * FROM {table_name} LIMIT {limit}", con=engine)
         return {
-            "dataset_id": dataset_id,
-            "table_name": table_name,
-            "total_rows": len(df),
+            "table": table_name,
+            "rows": len(df),
             "columns": list(df.columns),
             "data": df.to_dict(orient="records")
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error reading table: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error reading table '{table_name}': {str(e)}")
+
+@router.post("/query")
+async def run_query(sql: str):
+    """Run a raw SQL query (only SELECT)."""
+    if not sql.strip().lower().startswith("select"):
+        raise HTTPException(status_code=400, detail="Only SELECT queries are allowed")
+    try:
+        df = pd.read_sql(text(sql), con=engine)
+        return {
+            "rows_returned": len(df),
+            "columns": list(df.columns),
+            "data": df.to_dict(orient="records")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error executing query: {str(e)}")
+
