@@ -1,5 +1,28 @@
-venv/
+# Ignore Python bytecode and cache
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
+
+# Ignore virtual environments
+.venv/
+venv/
+
+# Ignore environment variables and secrets
+.env
+
+# Ignore SQLite database
+*.sqlite3
+*.db
+sqlite.db
+
+# Ignore upload folders
+uploads/
+*.log
+
+# VS Code settings (optional)
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
