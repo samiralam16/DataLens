@@ -15,8 +15,7 @@ if DATABASE_URL.startswith("postgres://"):
 
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False},  # Required for SQLite + FastAPI
-    pool_recycle=300,
+    connect_args={"check_same_thread": False},  
     pool_pre_ping=True,
 )
 
