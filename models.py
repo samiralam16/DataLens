@@ -100,3 +100,23 @@ class Visualization(Base):
             'dataset_id': self.dataset_id,
             'user_id': self.user_id
         }
+
+class Snapshot(Base):
+    __tablename__ = "snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    snapshot_name = Column(String, nullable=False)
+    sql_query = Column(Text, nullable=False)
+    result_table = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "snapshot_name": self.snapshot_name,
+            "sql_query": self.sql_query,
+            "result_table": self.result_table,
+            "created_at": self.created_at
+        }
+
+
