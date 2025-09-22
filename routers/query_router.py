@@ -1,7 +1,7 @@
 from typing import List
 import os
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
+from fastapi import APIRouter, Body, HTTPException, Depends, File, UploadFile, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import inspect, text
 from werkzeug.utils import secure_filename
@@ -32,9 +32,10 @@ async def preview_table(table_name: str, limit: int = 10):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading table '{table_name}': {str(e)}")
+    
 
 @router.post("/query")
-async def run_query(sql: str):
+async def run_query(sql: str = Form(...)):
     """Run a raw SQL query (only SELECT)."""
     if not sql.strip().lower().startswith("select"):
         raise HTTPException(status_code=400, detail="Only SELECT queries are allowed")

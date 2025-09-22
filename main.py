@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from dotenv import load_dotenv
 from extensions import create_tables
 from fastapi.responses import RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 import webbrowser
 import threading
@@ -19,6 +20,14 @@ def create_app():
     title="Data Visualization Backend API",
     description="A FastAPI backend for data visualization applications",
     version="2.0.0"
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     @app.get("/", include_in_schema=False)
