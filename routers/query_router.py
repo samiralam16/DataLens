@@ -1,4 +1,3 @@
-from typing import List
 import os
 import pandas as pd
 from fastapi import APIRouter, Body, HTTPException, Depends, File, UploadFile, Form,Query
@@ -9,15 +8,6 @@ from extensions import get_db, engine
 from models import Dataset
 from utils import load_dataset, get_data_preview
 from typing import List
-import os
-import pandas as pd
-from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
-from sqlalchemy.orm import Session
-from sqlalchemy import inspect, text
-from werkzeug.utils import secure_filename
-from extensions import get_db, engine
-from models import Dataset
-from utils import load_dataset, get_data_preview
 from models import Snapshot
 from schema import SnapshotRequest, SnapshotResponse
 
@@ -30,6 +20,7 @@ async def list_tables():
     inspector = inspect(engine)
     tables = inspector.get_table_names()
     return {"tables": tables, "total": len(tables)}
+
 
 @router.get("/preview/{table_name}")
 async def preview_table(table_name: str, limit: int = 10):
@@ -62,27 +53,6 @@ async def run_query(sql: str = Query(...)):
         raise HTTPException(status_code=500, detail=f"Error executing query: {str(e)}")
 
 
-
-@router.get("/tables")
-async def list_tables():
-    """Return all available tables in SQLite."""
-    inspector = inspect(engine)
-    tables = inspector.get_table_names()
-    return {"tables": tables, "total": len(tables)}
-
-@router.get("/preview/{table_name}")
-async def preview_table(table_name: str, limit: int = 10):
-    """Preview the first rows of a table."""
-    try:
-        df = pd.read_sql(f"SELECT * FROM {table_name} LIMIT {limit}", con=engine)
-        return {
-            "table": table_name,
-            "rows": len(df),
-            "columns": list(df.columns),
-            "data": df.to_dict(orient="records")
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error reading table '{table_name}': {str(e)}")
 
 # @router.post("")
 # async def run_query(sql: str):
