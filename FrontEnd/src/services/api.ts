@@ -66,12 +66,11 @@ export const listDatasets = async (): Promise<Dataset[]> => {
 
 // Execute SQL query
 export const executeQuery = async (sql: string): Promise<QueryResult> => {
-  const response = await fetch(`${API_BASE_URL}/query/query`, {
-    method: 'POST',
+  const response = await fetch(`${API_BASE_URL}/query?sql=${encodeURIComponent(sql)}`, {
+    method: 'GET',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/json',
     },
-    body: `sql=${encodeURIComponent(sql)}`,
   });
 
   if (!response.ok) {
