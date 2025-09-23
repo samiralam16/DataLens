@@ -7,8 +7,6 @@ from extensions import create_tables
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-import webbrowser
-import threading
   # Import routers
 from routers import data_router, charts_router, analysis_router, query_router
 
