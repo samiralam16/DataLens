@@ -1,26 +1,51 @@
-import { Upload, Database, History, Sparkles, Filter, BarChart, Settings, Home, FileText, Plus } from 'lucide-react';
+import { 
+  Upload, Database, History, Sparkles, Filter, 
+  BarChart, Settings, Home, FileText, Plus 
+} from 'lucide-react';
 import { Button } from './ui/button';
 import { Separator } from './ui/separator';
 import { cn } from './ui/utils';
+
+// 👇 1. Define NavItem type here
+interface NavItem {
+  icon: React.ComponentType<any>;
+  label: string;
+  id: string;
+  onClick?: () => void;   // optional, only some items use this
+}
 
 interface SidebarProps {
   isOpen: boolean;
   activeModule: 'sql' | 'web';
   onModuleChange: (module: 'sql' | 'web') => void;
+
+  activeTool?: string;
+  setActiveTool?: (tool: string) => void;
+
   onAIAssistantClick?: () => void;
   onAddChart?: () => void;
 }
 
-export function Sidebar({ isOpen, activeModule, onModuleChange, onAIAssistantClick, onAddChart }: SidebarProps) {
-  const sqlBuilderItems = [
-    { icon: Upload, label: 'Data Import', id: 'import', onClick: () => console.log('Data Import clicked') },
-    { icon: Database, label: 'Connected Sources', id: 'sources', onClick: () => console.log('Connected Sources clicked') },
-    { icon: FileText, label: 'SQL Editor', id: 'editor', onClick: () => console.log('SQL Editor clicked') },
-    { icon: History, label: 'Saved Queries', id: 'queries', onClick: () => console.log('Saved Queries clicked') },
-    { icon: Sparkles, label: 'AI Assistant', id: 'ai', onClick: onAIAssistantClick },
+export function Sidebar({ 
+  isOpen, 
+  activeModule, 
+  onModuleChange, 
+  activeTool, 
+  setActiveTool, 
+  onAIAssistantClick, 
+  onAddChart 
+}: SidebarProps) {
+
+  // 👇 2. Apply NavItem[] type here
+  const sqlBuilderItems: NavItem[] = [
+    { icon: Upload, label: 'Data Import', id: 'import' },
+    { icon: Database, label: 'Connected Sources', id: 'sources' },
+    { icon: FileText, label: 'SQL Editor', id: 'editor' },
+    { icon: History, label: 'Saved Queries', id: 'queries' },
+    { icon: Sparkles, label: 'AI Assistant', id: 'ai' },
   ];
 
-  const webBuilderItems = [
+  const webBuilderItems: NavItem[] = [
     { icon: Home, label: 'Dashboard', id: 'dashboard', onClick: () => console.log('Dashboard clicked') },
     { icon: Plus, label: 'Add Chart', id: 'add-chart', onClick: onAddChart },
     { icon: BarChart, label: 'Chart Library', id: 'charts', onClick: () => console.log('Chart Library clicked') },
@@ -47,9 +72,18 @@ export function Sidebar({ isOpen, activeModule, onModuleChange, onAIAssistantCli
             {items.map((item) => (
               <Button
                 key={item.id}
-                variant="ghost"
+                variant={activeTool === item.id ? "secondary" : "ghost"} 
                 className="w-full justify-start gap-3 h-10 cursor-pointer"
-                onClick={item.onClick}
+                onClick={() => {
+                  if (activeModule === 'sql' && setActiveTool) {
+                    setActiveTool(item.id); // switch tools inside SQLBuilder
+                  } else if (item.onClick) {
+                    item.onClick(); // only runs if defined
+                  }
+                  if (item.id === 'ai' && onAIAssistantClick) {
+                    onAIAssistantClick();
+                  }
+                }}
               >
                 <item.icon className="h-4 w-4" />
                 {item.label}

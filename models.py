@@ -119,4 +119,3 @@ class Snapshot(Base):
             "created_at": self.created_at
         }
 
-

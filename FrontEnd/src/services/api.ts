@@ -1,5 +1,8 @@
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = "http://localhost:8000";
 
+// ----------------------
+// Dataset Types
+// ----------------------
 export interface Dataset {
   id: number;
   name: string;
@@ -32,15 +35,32 @@ export interface ListDatasetsResponse {
   total: number;
 }
 
-// Upload multiple files
+// ----------------------
+// Saved Query (legacy type, not used for snapshots anymore)
+// ----------------------
+export interface SavedQuery {
+  id: number;
+  name: string;
+  description: string;
+  query: string;
+  tags: string[];
+  createdAt: string;
+  lastRun: string | null;
+  isFavorite: boolean;
+  author: string;
+}
+
+// ----------------------
+// Dataset APIs
+// ----------------------
 export const uploadFiles = async (files: File[]): Promise<UploadResponse> => {
   const formData = new FormData();
-  files.forEach(file => {
-    formData.append('files', file);
+  files.forEach((file) => {
+    formData.append("files", file);
   });
 
   const response = await fetch(`${API_BASE_URL}/api/data/upload-multiple`, {
-    method: 'POST',
+    method: "POST",
     body: formData,
   });
 
@@ -51,27 +71,28 @@ export const uploadFiles = async (files: File[]): Promise<UploadResponse> => {
   return response.json();
 };
 
-// List all datasets
 export const listDatasets = async (): Promise<Dataset[]> => {
   const response = await fetch(`${API_BASE_URL}/api/data/`);
-
   if (!response.ok) {
     throw new Error(`Failed to fetch datasets: ${response.statusText}`);
   }
-
   const data = await response.json();
-  // The API returns an array directly, but let's handle both formats
   return Array.isArray(data) ? data : data.datasets || [];
 };
 
-// Execute SQL query
+// ----------------------
+// Query Execution API
+// ----------------------
 export const executeQuery = async (sql: string): Promise<QueryResult> => {
-  const response = await fetch(`${API_BASE_URL}/query?sql=${encodeURIComponent(sql)}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/query?sql=${encodeURIComponent(sql)}`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
 
   if (!response.ok) {
     throw new Error(`Query failed: ${response.statusText}`);
@@ -80,14 +101,53 @@ export const executeQuery = async (sql: string): Promise<QueryResult> => {
   return response.json();
 };
 
-// Helper function to parse columns info string into array
+// ----------------------
+// Helpers
+// ----------------------
 export const parseColumnsInfo = (columnsInfo: string): string[] => {
   try {
-    // Remove any extra quotes and parse the string as JSON
     const cleanedInfo = columnsInfo.replace(/'/g, '"');
     return JSON.parse(cleanedInfo);
   } catch (error) {
-    console.error('Failed to parse columns info:', error);
+    console.error("Failed to parse columns info:", error);
     return [];
   }
+};
+
+// ----------------------
+// Snapshot Types
+// ----------------------
+export interface Snapshot {
+  id: number;
+  snapshot_name: string;
+  sql_query: string;
+  result_table: string;
+  created_at: string;
+}
+
+// Snapshot APIs
+export const listSnapshots = async (): Promise<Snapshot[]> => {
+  const res = await fetch(`${API_BASE_URL}/query/snapshots`);
+  if (!res.ok) throw new Error("Failed to fetch snapshots");
+  return res.json();
+};
+
+export const createSnapshot = async (
+  snapshot_name: string,
+  sql_query: string
+): Promise<Snapshot> => {
+  const res = await fetch(`${API_BASE_URL}/query/snapshots`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ snapshot_name, sql_query }),
+  });
+  if (!res.ok) throw new Error("Failed to create snapshot");
+  return res.json();
+};
+
+export const deleteSnapshot = async (id: number): Promise<void> => {
+  const res = await fetch(`${API_BASE_URL}/query/snapshots/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete snapshot");
 };

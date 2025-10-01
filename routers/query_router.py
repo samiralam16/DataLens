@@ -52,24 +52,6 @@ async def run_query(sql: str = Query(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error executing query: {str(e)}")
 
-
-
-# @router.post("")
-# async def run_query(sql: str):
-#     """Run a raw SQL query (only SELECT)."""
-#     if not sql.strip().lower().startswith("select"):
-#         raise HTTPException(status_code=400, detail="Only SELECT queries are allowed")
-#     try:
-#         df = pd.read_sql(text(sql), con=engine)
-#         return {
-#             "rows_returned": len(df),
-#             "columns": list(df.columns),
-#             "data": df.to_dict(orient="records")
-#         }
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error executing query: {str(e)}")
-
-
 @router.post("/snapshots", response_model=SnapshotResponse)
 async def create_snapshot(request: SnapshotRequest, db: Session = Depends(get_db)):
     """Create a snapshot: save query + results into a new table."""

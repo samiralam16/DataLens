@@ -1,5 +1,7 @@
 from pydantic import BaseModel
+from typing import List, Optional
 from datetime import datetime
+
 
 # ---------- Snapshot ----------
 class SnapshotRequest(BaseModel):
@@ -16,3 +18,4 @@ class SnapshotResponse(BaseModel):
 
     class Config:
         orm_mode = True
+

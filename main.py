@@ -1,25 +1,21 @@
 import os
-import threading
-import webbrowser
 from fastapi import FastAPI
-from dotenv import load_dotenv
-from extensions import create_tables
-from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
-  # Import routers
+# Import routers
 from routers import data_router, charts_router, analysis_router, query_router
+from extensions import create_tables
 
-load_dotenv()
 
 def create_app():
-    # Initialize FastAPI app
     app = FastAPI(
-    title="Data Visualization Backend API",
-    description="A FastAPI backend for data visualization applications",
-    version="2.0.0"
+        title="Data Visualization Backend API",
+        description="A FastAPI backend for data visualization applications",
+        version="2.0.0"
     )
 
+    # Enable CORS
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -28,14 +24,15 @@ def create_app():
         allow_headers=["*"],
     )
 
+    # Root redirect to Swagger docs
     @app.get("/", include_in_schema=False)
     async def root_redirect():
         return RedirectResponse(url="/docs")
 
-    # Create uploads folder
-    os.makedirs("uploads", exist_ok=True)  
+    # Ensure upload folder exists
+    os.makedirs("uploads", exist_ok=True)
 
-    # Create DB tables
+    # Initialize database tables
     create_tables()
 
     # Include routers
@@ -44,16 +41,7 @@ def create_app():
     app.include_router(analysis_router.router, prefix="/api/analysis", tags=["Analysis"])
     app.include_router(query_router.router, prefix="/query", tags=["Query"])
 
-    # Optional: endpoint to list all routes
-    @app.get("/endpoints")
-    async def list_endpoints():
-        return [
-            {"path": route.path, "methods": list(route.methods)}
-            for route in app.routes if hasattr(route, "methods")
-        ]
-
     return app
 
+
 app = create_app()
-
-
