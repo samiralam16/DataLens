@@ -1,3 +1,4 @@
+// src/App.tsx
 import { useState, useRef } from "react";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
@@ -11,7 +12,10 @@ export default function App() {
   const [activeModule, setActiveModule] = useState<"sql" | "web">("sql");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
-  const [activeTool, setActiveTool] = useState("editor");
+
+  // 🔑 Two separate states:
+  const [activeTool, setActiveTool] = useState("editor"); // SQL tools
+  const [activeTab, setActiveTab] = useState("dashboard"); // Web tabs
 
   const addChartRef = useRef<(() => void) | null>(null);
 
@@ -24,6 +28,7 @@ export default function App() {
     <DataProvider>
       <SQLProvider>
         <div className="h-screen flex flex-col bg-background">
+          {/* Header */}
           <Header
             activeModule={activeModule}
             setActiveModule={setActiveModule}
@@ -32,6 +37,7 @@ export default function App() {
           />
 
           <div className="flex flex-1 overflow-hidden">
+            {/* ✅ Global Sidebar (controls both modules) */}
             <Sidebar
               isOpen={sidebarOpen}
               activeModule={activeModule}
@@ -40,8 +46,16 @@ export default function App() {
               setActiveTool={setActiveTool}
               onAIAssistantClick={handleAIAssistantToggle}
               onAddChart={() => addChartRef.current?.()}
+              onChangeTab={(tab) => {
+                if (activeModule === "web") {
+                  setActiveTab(tab);   // ✅ for WebBuilder
+                } else {
+                  setActiveTool(tab);  // ✅ for SQLBuilder
+                }
+              }}
             />
 
+            {/* Main content */}
             <main className="flex-1 overflow-hidden">
               {activeModule === "sql" ? (
                 <SQLBuilder
@@ -51,7 +65,11 @@ export default function App() {
                   setShowAIAssistant={setShowAIAssistant}
                 />
               ) : (
-                <WebBuilder addChartRef={addChartRef} />
+                <WebBuilder
+                  addChartRef={addChartRef}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                />
               )}
             </main>
           </div>
