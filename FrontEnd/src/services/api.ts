@@ -1,5 +1,5 @@
 // src/services/api.ts
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = "http://localhost:8000";
 
 // ----------------------
 // Dataset Types
@@ -52,7 +52,7 @@ export interface SavedQuery {
 }
 
 // ----------------------
-// Dataset APIs
+// Dataset APIs (/api/data/...)
 // ----------------------
 export const uploadFiles = async (files: File[]): Promise<UploadResponse> => {
   const formData = new FormData();
@@ -60,7 +60,7 @@ export const uploadFiles = async (files: File[]): Promise<UploadResponse> => {
     formData.append("files", file);
   });
 
-  const response = await fetch(`${API_BASE_URL}/data/upload-multiple`, {
+  const response = await fetch(`${API_BASE_URL}/api/data/upload-multiple`, {
     method: "POST",
     body: formData,
   });
@@ -73,7 +73,7 @@ export const uploadFiles = async (files: File[]): Promise<UploadResponse> => {
 };
 
 export const listDatasets = async (): Promise<Dataset[]> => {
-  const response = await fetch(`${API_BASE_URL}/data/`);
+  const response = await fetch(`${API_BASE_URL}/api/data/`);
   if (!response.ok) {
     throw new Error(`Failed to fetch datasets: ${response.statusText}`);
   }
@@ -86,7 +86,7 @@ export const getDatasetPreview = async (
   limit: number = 50
 ): Promise<{ rows: any[]; columns: { name: string; dtype: string }[] }> => {
   const response = await fetch(
-    `${API_BASE_URL}/data/${datasetId}/preview?limit=${limit}`
+    `${API_BASE_URL}/api/data/${datasetId}/preview?limit=${limit}`
   );
   if (!response.ok) {
     throw new Error(`Failed to fetch dataset preview: ${response.statusText}`);
@@ -95,7 +95,7 @@ export const getDatasetPreview = async (
 };
 
 // ----------------------
-// Query Execution API
+// Query Execution API (/query?...)
 // ----------------------
 export const executeQuery = async (sql: string): Promise<QueryResult> => {
   const response = await fetch(
@@ -137,7 +137,8 @@ export interface Snapshot {
   created_at: string;
 }
 
-// Snapshot APIs
+// Snapshot APIs (/query/snapshots/...)
+// ----------------------
 export const listSnapshots = async (): Promise<Snapshot[]> => {
   const res = await fetch(`${API_BASE_URL}/query/snapshots`);
   if (!res.ok) throw new Error("Failed to fetch snapshots");
