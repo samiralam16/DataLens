@@ -4,7 +4,7 @@ import { DataImport } from "./sql-builder/DataImport";
 import { SQLEditor } from "./sql-builder/SQLEditor";
 import { AIAssistant } from "./sql-builder/AIAssistant";
 import { SavedQueries } from "./sql-builder/SavedQueries";
-import { ConnectedSources } from "./sql-builder/ConnectedSources"
+import { ConnectedSources } from "./sql-builder/ConnectedSources";
 import { ResultsDisplay } from "./sql-builder/ResultsDisplay";
 import {
   ResizableHandle,
@@ -32,7 +32,7 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
   const [activeQuery, setActiveQuery] = useState("");
   const [queryResults, setQueryResults] = useState<any[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [activeTab, setActiveTab] = useState<"editor" | "import" | "saved">(
+  const [activeTab, setActiveTab] = useState<"editor" | "import" | "saved" | "sources">(
     "editor"
   );
 
@@ -160,6 +160,7 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
           { key: "editor", label: "SQL Editor" },
           { key: "import", label: "Data Import" },
           { key: "saved", label: "Saved Queries" },
+          { key: "sources", label: "Connected Sources" },
         ].map(({ key, label }) => (
           <button
             key={key}
@@ -198,8 +199,14 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
 
         {activeTab === "import" && <DataImport />}
         {activeTab === "saved" && (
-          <SavedQueries onLoadQuery={setActiveQuery} />
+          <SavedQueries
+            goToEditor={() => {
+              setActiveTab("editor");
+              setActiveTool("editor"); // ensure global tool also changes
+            }}
+          />
         )}
+        {activeTab === "sources" && <ConnectedSources />}
       </div>
     </>
   );
@@ -211,11 +218,17 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
         {activeTool === "editor" && renderEditor()}
         {activeTool === "import" && <DataImport />}
         {activeTool === "queries" && (
-          <SavedQueries onLoadQuery={setActiveQuery} />
+          <SavedQueries
+            goToEditor={() => {
+              setActiveTool("editor");
+              setActiveTab("editor");
+            }}
+          />
         )}
         {activeTool === "ai" && (
           <AIAssistant onQueryGenerated={setActiveQuery} />
         )}
+        {activeTool === "sources" && <ConnectedSources />}
       </div>
 
       {showAIAssistant && (
