@@ -18,11 +18,13 @@ interface SidebarProps {
   activeModule: "sql" | "web";
   onModuleChange: (module: "sql" | "web") => void;
 
-  activeTool?: string;
+  activeTool?: string;       // for SQL
   setActiveTool?: (tool: string) => void;
 
-  onAIAssistantClick?: () => void;
+  activeTab?: string;        // for Web
   onChangeTab?: (tab: string) => void;
+
+  onAIAssistantClick?: () => void;
 }
 
 export function Sidebar({
@@ -30,8 +32,9 @@ export function Sidebar({
   activeModule,
   activeTool,
   setActiveTool,
-  onAIAssistantClick,
+  activeTab,
   onChangeTab,
+  onAIAssistantClick,
 }: SidebarProps) {
   // SQL Builder items
   const sqlBuilderItems: NavItem[] = [
@@ -68,26 +71,33 @@ export function Sidebar({
             {activeModule === "sql" ? "SQL Tools" : "Dashboard Tools"}
           </h3>
           <nav className="space-y-1">
-            {items.map((item) => (
-              <Button
-                key={item.id}
-                variant={activeTool === item.id ? "secondary" : "ghost"}
-                className="w-full justify-start gap-3 h-10 cursor-pointer"
-                onClick={() => {
-                  if (activeModule === "sql" && setActiveTool) {
-                    setActiveTool(item.id);
-                  } else if (item.onClick) {
-                    item.onClick();
-                  }
-                  if (item.id === "ai" && onAIAssistantClick) {
-                    onAIAssistantClick();
-                  }
-                }}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </Button>
-            ))}
+            {items.map((item) => {
+              const isActive =
+                activeModule === "sql"
+                  ? activeTool === item.id
+                  : activeTab === item.id;
+
+              return (
+                <Button
+                  key={item.id}
+                  variant={isActive ? "secondary" : "ghost"}
+                  className="w-full justify-start gap-3 h-10 cursor-pointer"
+                  onClick={() => {
+                    if (activeModule === "sql" && setActiveTool) {
+                      setActiveTool(item.id);
+                    } else if (activeModule === "web" && item.onClick) {
+                      item.onClick();
+                    }
+                    if (item.id === "ai" && onAIAssistantClick) {
+                      onAIAssistantClick();
+                    }
+                  }}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </Button>
+              );
+            })}
           </nav>
         </div>
 

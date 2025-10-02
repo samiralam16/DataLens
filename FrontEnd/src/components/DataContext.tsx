@@ -1,15 +1,22 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { Dataset, listDatasets, parseColumnsInfo, getDatasetPreview } from '../services/api';
+import { 
+  Dataset, 
+  listDatasets, 
+  parseColumnsInfo, 
+  getDatasetPreview, 
+  listSnapshots, 
+  getSnapshotPreview 
+} from '../services/api';
 
 export interface DataSource {
-  id: string; // DB primary key
-  name: string; // Friendly display name
-  tableName: string; // ✅ Actual SQLite table name
-  type: 'csv' | 'database' | 'api' | 'cloud';
+  id: string;
+  name: string;
+  tableName: string;
+  type: 'csv' | 'database' | 'api' | 'cloud' | 'snapshot';
   status: 'connected' | 'pending' | 'error';
   data: any[];
   columns: { name: string; type: 'string' | 'number' | 'date'; originalName: string }[];
-  backendDataset?: Dataset;
+  backendDataset?: Dataset | null;
 }
 
 export interface AnalyzedData {
@@ -25,14 +32,13 @@ interface DataContextType {
   analyzedData: AnalyzedData | null;
   datasets: Dataset[];
   loading: boolean;
-  activeDatasetId: string | null; // ✅ always stores tableName now
+  activeDatasetId: string | null;
   activeModule: 'sql' | 'web';
   setActiveDataset: (id: string | null) => void;
   setActiveModule: (m: 'sql' | 'web') => void;
   refreshDatasets: () => Promise<void>;
   setAnalyzedData: (data: AnalyzedData | null) => void;
 
-  // 👇 New methods for managing sources
   addDataSource: (src: DataSource) => void;
   updateDataSource: (id: string, partial: Partial<DataSource>) => void;
   removeDataSource: (id: string) => void;
@@ -66,13 +72,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
     refreshDatasets();
   }, []);
 
+  // ✅ Smarter type inference
+  const inferColumnType = (col: string, sampleRows: any[]): 'string' | 'number' | 'date' => {
+    const values = sampleRows.map(r => r[col]).filter(Boolean).slice(0, 5);
+    if (values.length === 0) return 'string';
+    if (values.every(v => !isNaN(Number(v)))) return 'number';
+    if (values.every(v => !isNaN(Date.parse(v)))) return 'date';
+    return 'string';
+  };
+
   const refreshDatasets = async () => {
     setLoading(true);
     try {
       const backendDatasets = await listDatasets();
+      const backendSnapshots = await listSnapshots();
       setDatasets(backendDatasets);
 
-      const convertedSources: DataSource[] = await Promise.all(
+      // Convert datasets
+      const datasetSources: DataSource[] = await Promise.all(
         backendDatasets.map(async (dataset) => {
           const columns = parseColumnsInfo(dataset.columns_info);
           let rows: any[] = [];
@@ -84,7 +101,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           }
 
           return {
-            id: dataset.id.toString(),
+            id: `dataset-${dataset.id}`,
             name: dataset.name,
             tableName: dataset.name.replace(/\s+/g, "_").toLowerCase(),
             type: dataset.file_type as any,
@@ -92,7 +109,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             data: rows,
             columns: columns.map(c => ({
               name: c,
-              type: inferColumnType(c),
+              type: inferColumnType(c, rows),
               originalName: c
             })),
             backendDataset: dataset
@@ -100,22 +117,41 @@ export function DataProvider({ children }: { children: ReactNode }) {
         })
       );
 
-      setDataSources(convertedSources);
+      // Convert snapshots
+      const snapshotSources: DataSource[] = await Promise.all(
+        backendSnapshots.map(async (snap) => {
+          let preview: any = { columns: [], rows: [] };
+          try {
+            preview = await getSnapshotPreview(snap.id, 20);
+          } catch (err) {
+            console.warn("Preview fetch failed for snapshot", snap.snapshot_name, err);
+          }
+
+          return {
+            id: `snapshot-${snap.id}`,
+            name: snap.snapshot_name,
+            tableName: snap.result_table,
+            type: 'snapshot',
+            status: 'connected',
+            data: preview.rows || [],
+            columns: (preview.columns || []).map(c => ({
+              name: c.name,
+              type: inferColumnType(c.name, preview.rows || []),
+              originalName: c.name
+            })),
+            backendDataset: null
+          };
+        })
+      );
+
+      setDataSources([...datasetSources, ...snapshotSources]);
     } catch (err) {
-      console.error("Failed to refresh datasets", err);
+      console.error("Failed to refresh datasets/snapshots", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const inferColumnType = (col: string): 'string' | 'number' | 'date' => {
-    const lower = col.toLowerCase();
-    if (lower.includes('date') || lower.includes('time')) return 'date';
-    if (lower.includes('id') || lower.includes('count') || lower.includes('price')) return 'number';
-    return 'string';
-  };
-
-  // 👇 Implemented helper methods
   const addDataSource = (src: DataSource) => {
     setDataSources(prev => [...prev, src]);
   };
@@ -131,13 +167,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addDatasetAsSource = (dataset: Dataset) => {
     const columns = parseColumnsInfo(dataset.columns_info);
     const newSource: DataSource = {
-      id: dataset.id.toString(),
+      id: `dataset-${dataset.id}`,
       name: dataset.name,
       tableName: dataset.name.replace(/\s+/g, "_").toLowerCase(),
       type: dataset.file_type as any,
       status: dataset.is_processed ? "connected" : "pending",
       data: [],
-      columns: columns.map(c => ({ name: c, type: inferColumnType(c), originalName: c })),
+      columns: columns.map(c => ({ name: c, type: 'string', originalName: c })),
       backendDataset: dataset,
     };
     setDataSources(prev => [...prev, newSource]);

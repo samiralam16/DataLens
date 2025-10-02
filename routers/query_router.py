@@ -128,3 +128,41 @@ async def delete_snapshot(snapshot_id: int, db: Session = Depends(get_db)):
         return {"message": f"Snapshot '{snapshot.snapshot_name}' deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting snapshot: {str(e)}")
+
+@router.get("/all-sources")
+async def list_all_sources(db: Session = Depends(get_db)):
+    datasets = db.query(Dataset).all()
+    snapshots = db.query(Snapshot).all()
+
+    # Format datasets
+    dataset_sources = [
+        {
+            "id": d.id,
+            "name": d.name,
+            "type": "dataset",
+            "rows": d.row_count,
+            "file_type": d.file_type
+        }
+        for d in datasets
+    ]
+
+    # Format snapshots (calculate row count from snapshot.result_table)
+    snapshot_sources = []
+    for s in snapshots:
+        try:
+            df = pd.read_sql(f'SELECT COUNT(*) as cnt FROM "{s.result_table}"', con=engine)
+            row_count = int(df["cnt"].iloc[0])
+        except Exception:
+            row_count = 0
+
+        snapshot_sources.append({
+            "id": s.id,
+            "name": s.snapshot_name,
+            "type": "snapshot",
+            "rows": row_count,
+            "file_type": "snapshot",
+            "result_table": s.result_table 
+        })
+
+    return {"sources": dataset_sources + snapshot_sources}
+

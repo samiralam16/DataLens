@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Play, Save, Download, Copy, RotateCcw, Database } from "lucide-react";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
@@ -7,9 +7,8 @@ import { Separator } from "../ui/separator";
 import { ScrollArea } from "../ui/scroll-area";
 import { Card } from "../ui/card";
 import { toast } from "sonner@2.0.3";
-import { useData } from "../DataContext";
-import { useSQL } from "./SQLContext"; // 👈 use context
-import { createSnapshot } from "../../services/api";
+import { useSQL } from "./SQLContext";
+import { createSnapshot, listAllSources } from "../../services/api";
 
 interface SQLEditorProps {
   onExecuteQuery: (query: string) => void;
@@ -17,11 +16,31 @@ interface SQLEditorProps {
 }
 
 export function SQLEditor({ onExecuteQuery, isExecuting }: SQLEditorProps) {
-  const { datasets, loading } = useData();
-  const { query, setQuery } = useSQL(); // 👈 context state
+  const { query, setQuery } = useSQL();
   const [queryHistory, setQueryHistory] = useState<string[]>([]);
-  const [selectedDataset, setSelectedDataset] = useState<string | null>(null);
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // 👇 merged datasets + snapshots
+  const [sources, setSources] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchSources = async () => {
+    setLoading(true);
+    try {
+      const data = await listAllSources();
+      setSources(data.sources);
+    } catch (e) {
+      console.error("Failed to fetch sources", e);
+      toast.error("Failed to load datasets/snapshots");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSources();
+  }, []);
 
   const handleExecute = () => {
     if (!query.trim()) {
@@ -34,25 +53,26 @@ export function SQLEditor({ onExecuteQuery, isExecuting }: SQLEditorProps) {
   };
 
   const handleSave = async () => {
-  if (!query.trim()) {
-    toast.error("Please enter a SQL query to save");
-    return;
-  }
+    if (!query.trim()) {
+      toast.error("Please enter a SQL query to save");
+      return;
+    }
 
-  const snapshotName = prompt("Enter a name for this snapshot:");
-  if (!snapshotName) {
-    toast.error("Snapshot name is required");
-    return;
-  }
+    const snapshotName = prompt("Enter a name for this snapshot:");
+    if (!snapshotName) {
+      toast.error("Snapshot name is required");
+      return;
+    }
 
-  try {
-    await createSnapshot(snapshotName, query);   // 👈 calls backend now
-    toast.success("Query saved as snapshot");
-  } catch (err) {
-    console.error("Error saving snapshot", err);
-    toast.error("Failed to save snapshot");
-  }
-};
+    try {
+      await createSnapshot(snapshotName, query);
+      toast.success("Query saved as snapshot");
+      fetchSources(); // refresh list
+    } catch (err) {
+      console.error("Error saving snapshot", err);
+      toast.error("Failed to save snapshot");
+    }
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(query);
@@ -70,10 +90,10 @@ export function SQLEditor({ onExecuteQuery, isExecuting }: SQLEditorProps) {
     toast.success("Query downloaded");
   };
 
-  const insertDatasetQuery = (datasetName: string) => {
-    const newQuery = `SELECT * FROM "${datasetName}" LIMIT 10;`;
-    setQuery(newQuery); // 👈 update editor via context
-    toast.success(`Query template inserted for ${datasetName}`);
+  const insertDatasetQuery = (tableName: string) => {
+    const newQuery = `SELECT * FROM "${tableName}" LIMIT 10;`;
+    setQuery(newQuery);
+    toast.success(`Query template inserted for ${tableName}`);
   };
 
   return (
@@ -125,7 +145,7 @@ export function SQLEditor({ onExecuteQuery, isExecuting }: SQLEditorProps) {
         </div>
       </div>
 
-      {/* Sidebar for datasets (unchanged) */}
+      {/* Sidebar for datasets + snapshots */}
       <div className="w-80 border-l border-border bg-card">
         <div className="border-b border-border p-4">
           <h4 className="font-medium flex items-center gap-2">
@@ -133,7 +153,7 @@ export function SQLEditor({ onExecuteQuery, isExecuting }: SQLEditorProps) {
             Available Datasets
           </h4>
           <p className="text-xs text-muted-foreground mt-1">
-            Click on a dataset to insert a query template
+            Click on a dataset or snapshot to insert a query template
           </p>
         </div>
 
@@ -141,34 +161,42 @@ export function SQLEditor({ onExecuteQuery, isExecuting }: SQLEditorProps) {
           <div className="p-4 space-y-3">
             {loading ? (
               <div className="text-center text-muted-foreground text-sm py-8">
-                Loading datasets...
+                Loading sources...
               </div>
-            ) : datasets.length === 0 ? (
+            ) : sources.length === 0 ? (
               <div className="text-center text-muted-foreground text-sm py-8">
-                No datasets available. Upload data files to get started.
+                No datasets or snapshots available.
               </div>
             ) : (
-              datasets.map((dataset) => (
+              sources.map((src) => (
                 <Card
-                  key={dataset.id}
-                  className={`p-3 cursor-pointer hover:bg-accent transition-colors ${
-                    selectedDataset === dataset.name ? "ring-2 ring-primary" : ""
-                  }`}
-                  onClick={() => {
-                    setSelectedDataset(dataset.name);
-                    insertDatasetQuery(dataset.name);
-                  }}
-                >
+                    key={`${src.type}-${src.id}`}
+                    className={`p-3 cursor-pointer hover:bg-accent transition-colors ${
+                      selectedSource === src.name ? "ring-2 ring-primary" : ""
+                    }`}
+                    onClick={() => {
+                      setSelectedSource(src.name);
+                      const tableName = src.type === "snapshot" ? src.result_table : src.name;
+                      if (tableName) {
+                        insertDatasetQuery(tableName);
+                      } else {
+                        toast.error("Table name not found for this source");
+                      }
+                    }}
+                  >
+
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h5 className="font-medium text-sm">{dataset.name}</h5>
-                      <p className="text-xs text-muted-foreground mt-1">{dataset.filename}</p>
+                      <h5 className="font-medium text-sm">{src.name}</h5>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {src.type === "snapshot" ? "Snapshot" : src.filename}
+                      </p>
                       <div className="flex items-center gap-2 mt-2">
                         <Badge variant="outline" className="text-xs">
-                          {dataset.file_type.toUpperCase()}
+                          {src.type.toUpperCase()}
                         </Badge>
                         <Badge variant="secondary" className="text-xs">
-                          {dataset.row_count} rows
+                          {src.rows} rows
                         </Badge>
                       </div>
                     </div>

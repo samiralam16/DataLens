@@ -1,4 +1,3 @@
-// src/services/api.ts
 const API_BASE_URL = "http://localhost:8000";
 
 // ----------------------
@@ -81,10 +80,17 @@ export const listDatasets = async (): Promise<Dataset[]> => {
   return data.datasets || [];
 };
 
+// ✅ Unified preview response type
+export interface PreviewResponse {
+  columns: { name: string; dtype: string }[];
+  rows: any[];
+  total_rows: number;
+}
+
 export const getDatasetPreview = async (
   datasetId: number,
   limit: number = 50
-): Promise<{ rows: any[]; columns: { name: string; dtype: string }[] }> => {
+): Promise<PreviewResponse> => {
   const response = await fetch(
     `${API_BASE_URL}/api/data/${datasetId}/preview?limit=${limit}`
   );
@@ -137,6 +143,7 @@ export interface Snapshot {
   created_at: string;
 }
 
+// ----------------------
 // Snapshot APIs (/query/snapshots/...)
 // ----------------------
 export const listSnapshots = async (): Promise<Snapshot[]> => {
@@ -163,4 +170,37 @@ export const deleteSnapshot = async (id: number): Promise<void> => {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete snapshot");
+};
+
+// ----------------------
+// Snapshot Preview API (normalized same as dataset preview)
+// ----------------------
+export const getSnapshotPreview = async (
+  snapshotId: number,
+  limit: number = 50
+): Promise<PreviewResponse> => {
+  const res = await fetch(
+    `${API_BASE_URL}/query/snapshots/${snapshotId}/preview?limit=${limit}`
+  );
+  if (!res.ok) throw new Error("Failed to fetch snapshot preview");
+  return res.json();
+};
+
+// ----------------------
+// 🔥 Unified Sources API (datasets + snapshots)
+// ----------------------
+export interface DataSource {
+  id: number;
+  name: string;
+  type: "dataset" | "snapshot";
+  rows: number;
+  file_type: string;
+  filename?: string; // dataset only
+  result_table?: string; // snapshot only
+}
+
+export const listAllSources = async (): Promise<{ sources: DataSource[] }> => {
+  const res = await fetch(`${API_BASE_URL}/query/all-sources`);
+  if (!res.ok) throw new Error("Failed to fetch sources");
+  return res.json();
 };
