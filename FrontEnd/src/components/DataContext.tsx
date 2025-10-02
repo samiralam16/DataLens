@@ -31,6 +31,12 @@ interface DataContextType {
   setActiveModule: (m: 'sql' | 'web') => void;
   refreshDatasets: () => Promise<void>;
   setAnalyzedData: (data: AnalyzedData | null) => void;
+
+  // 👇 New methods for managing sources
+  addDataSource: (src: DataSource) => void;
+  updateDataSource: (id: string, partial: Partial<DataSource>) => void;
+  removeDataSource: (id: string) => void;
+  addDatasetAsSource: (dataset: Dataset) => void;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -41,7 +47,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [analyzedData, setAnalyzedData] = useState<AnalyzedData | null>(null);
 
-  // persist across reloads
   const [activeDatasetId, setActiveDatasetId] = useState<string | null>(() =>
     localStorage.getItem("activeDatasetId")
   );
@@ -57,7 +62,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("activeModule", activeModule);
   }, [activeModule]);
 
-  // Load datasets
   useEffect(() => {
     refreshDatasets();
   }, []);
@@ -82,7 +86,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           return {
             id: dataset.id.toString(),
             name: dataset.name,
-            tableName: dataset.name.replace(/\s+/g, "_").toLowerCase(), // ✅ normalized
+            tableName: dataset.name.replace(/\s+/g, "_").toLowerCase(),
             type: dataset.file_type as any,
             status: dataset.is_processed ? 'connected' : 'pending',
             data: rows,
@@ -111,6 +115,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return 'string';
   };
 
+  // 👇 Implemented helper methods
+  const addDataSource = (src: DataSource) => {
+    setDataSources(prev => [...prev, src]);
+  };
+
+  const updateDataSource = (id: string, partial: Partial<DataSource>) => {
+    setDataSources(prev => prev.map(ds => ds.id === id ? { ...ds, ...partial } : ds));
+  };
+
+  const removeDataSource = (id: string) => {
+    setDataSources(prev => prev.filter(ds => ds.id !== id));
+  };
+
+  const addDatasetAsSource = (dataset: Dataset) => {
+    const columns = parseColumnsInfo(dataset.columns_info);
+    const newSource: DataSource = {
+      id: dataset.id.toString(),
+      name: dataset.name,
+      tableName: dataset.name.replace(/\s+/g, "_").toLowerCase(),
+      type: dataset.file_type as any,
+      status: dataset.is_processed ? "connected" : "pending",
+      data: [],
+      columns: columns.map(c => ({ name: c, type: inferColumnType(c), originalName: c })),
+      backendDataset: dataset,
+    };
+    setDataSources(prev => [...prev, newSource]);
+  };
+
   return (
     <DataContext.Provider value={{
       dataSources,
@@ -122,7 +154,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setActiveDataset: setActiveDatasetId,
       setActiveModule: setActiveModuleState,
       refreshDatasets,
-      setAnalyzedData
+      setAnalyzedData,
+      addDataSource,
+      updateDataSource,
+      removeDataSource,
+      addDatasetAsSource
     }}>
       {children}
     </DataContext.Provider>
