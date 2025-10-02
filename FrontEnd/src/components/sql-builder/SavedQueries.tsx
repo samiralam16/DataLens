@@ -1,6 +1,6 @@
 // src/components/sql-builder/SavedQueries.tsx
 import { useEffect, useState } from "react";
-import { Search, Play, Trash2, Clock } from "lucide-react";
+import { Search, Play, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {
@@ -10,19 +10,9 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "../ui/alert-dialog";
 import { toast } from "sonner@2.0.3";
 import { listSnapshots, deleteSnapshot, Snapshot } from "../../services/api";
+import { useSQL } from "./SQLContext"; // 👈 import context
 
 interface SavedQuery {
   id: number;
@@ -36,14 +26,15 @@ interface SavedQuery {
   author: string;
 }
 
-// 👇 new props
+// 👇 new props for navigation
 interface SavedQueriesProps {
-  onLoadQuery: (query: string) => void;
+  goToEditor: () => void;
 }
 
-export function SavedQueries({ onLoadQuery }: SavedQueriesProps) {
+export function SavedQueries({ goToEditor }: SavedQueriesProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([]);
+  const { setQuery } = useSQL();
 
   const mapSnapshotToSavedQuery = (s: Snapshot): SavedQuery => ({
     id: s.id,
@@ -116,9 +107,13 @@ export function SavedQueries({ onLoadQuery }: SavedQueriesProps) {
                 {query.query}
               </pre>
               <div className="flex justify-between mt-3">
-                {/* 👇 Now uses prop */}
+                {/* 👇 Load query + jump to editor */}
                 <Button
-                  onClick={() => onLoadQuery(query.query)}
+                  onClick={() => {
+                    setQuery(query.query);
+                    toast.success("Query loaded into editor");
+                    goToEditor(); // 👈 navigate to editor
+                  }}
                   className="gap-2"
                 >
                   <Play className="h-4 w-4" /> Load Query

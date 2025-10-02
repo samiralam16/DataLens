@@ -7,6 +7,7 @@ from werkzeug.utils import secure_filename
 from extensions import get_db, engine
 from models import Dataset
 from utils import load_dataset,get_data_preview
+from sqlalchemy import text
 
 router = APIRouter()
 
@@ -101,9 +102,16 @@ async def delete_dataset(dataset_id: int, db: Session = Depends(get_db)):
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
 
+    # Drop table in SQLite
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(f'DROP TABLE IF EXISTS "{dataset.name}"'))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to drop table: {str(e)}")
+
     if os.path.exists(dataset.file_path):
         os.remove(dataset.file_path)
 
     db.delete(dataset)
     db.commit()
-    return {"message": "Dataset deleted successfully"}
+    return {"message": f"Dataset '{dataset.name}' deleted successfully"}
