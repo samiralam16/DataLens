@@ -1,4 +1,5 @@
-const API_BASE_URL = "http://localhost:8000";
+// src/services/api.ts
+const API_BASE_URL = "http://localhost:8000/api";
 
 // ----------------------
 // Dataset Types
@@ -59,7 +60,7 @@ export const uploadFiles = async (files: File[]): Promise<UploadResponse> => {
     formData.append("files", file);
   });
 
-  const response = await fetch(`${API_BASE_URL}/api/data/upload-multiple`, {
+  const response = await fetch(`${API_BASE_URL}/data/upload-multiple`, {
     method: "POST",
     body: formData,
   });
@@ -72,12 +73,25 @@ export const uploadFiles = async (files: File[]): Promise<UploadResponse> => {
 };
 
 export const listDatasets = async (): Promise<Dataset[]> => {
-  const response = await fetch(`${API_BASE_URL}/api/data/`);
+  const response = await fetch(`${API_BASE_URL}/data/`);
   if (!response.ok) {
     throw new Error(`Failed to fetch datasets: ${response.statusText}`);
   }
   const data = await response.json();
-  return Array.isArray(data) ? data : data.datasets || [];
+  return data.datasets || [];
+};
+
+export const getDatasetPreview = async (
+  datasetId: number,
+  limit: number = 50
+): Promise<{ rows: any[]; columns: { name: string; dtype: string }[] }> => {
+  const response = await fetch(
+    `${API_BASE_URL}/data/${datasetId}/preview?limit=${limit}`
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to fetch dataset preview: ${response.statusText}`);
+  }
+  return response.json();
 };
 
 // ----------------------
@@ -88,9 +102,7 @@ export const executeQuery = async (sql: string): Promise<QueryResult> => {
     `${API_BASE_URL}/query?sql=${encodeURIComponent(sql)}`,
     {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
     }
   );
 

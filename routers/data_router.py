@@ -115,3 +115,27 @@ async def delete_dataset(dataset_id: int, db: Session = Depends(get_db)):
     db.delete(dataset)
     db.commit()
     return {"message": f"Dataset '{dataset.name}' deleted successfully"}
+
+@router.get("/{dataset_id}/preview")
+async def preview_dataset(dataset_id: int, limit: int = 50, db: Session = Depends(get_db)):
+    """Return schema and sample rows for a dataset by ID."""
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(status_code=404, detail="Dataset not found")
+
+    try:
+        table_name = dataset.name.replace(" ", "_").lower()
+        df = pd.read_sql(f'SELECT * FROM "{table_name}" LIMIT {limit}', con=engine)
+
+        schema = [{"name": col, "dtype": str(dtype)} for col, dtype in zip(df.columns, df.dtypes)]
+        rows = df.to_dict(orient="records")
+
+        return {
+            "dataset": dataset.to_dict(),
+            "columns": schema,
+            "rows": rows,
+            "total_rows": dataset.row_count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to preview dataset: {str(e)}")
+
