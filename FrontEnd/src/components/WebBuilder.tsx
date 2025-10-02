@@ -1,3 +1,4 @@
+// src/components/WebBuilder.tsx
 import { useState } from "react";
 import { DashboardBuilder } from "./web-builder/DashboardBuilder";
 import { FilterPanel } from "./web-builder/FilterPanel";
@@ -15,8 +16,8 @@ export interface ChartConfig {
   type: "bar" | "line" | "pie" | "scatter" | "heatmap" | "treemap" | "geo";
   title: string;
   data: any[];
-  x: string;
-  y: string;
+  x: string; // leave empty until user picks
+  y: string; // leave empty until user picks
   position: { x: number; y: number };
   size: { width: number; height: number };
   filters: Record<string, any>;
@@ -35,24 +36,23 @@ export interface FilterConfig {
 interface WebBuilderProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  addChartRef?: React.MutableRefObject<(() => void) | null>;
 }
 
-export function WebBuilder({ activeTab, setActiveTab }: WebBuilderProps) {
-  const { analyzedData, dataSources, activeDatasetId, setActiveDataset } =
-    useData();
+export function WebBuilder({ activeTab, setActiveTab, addChartRef }: WebBuilderProps) {
+  const { dataSources, activeDatasetId, setActiveDataset } = useData();
   const [charts, setCharts] = useState<ChartConfig[]>([]);
   const [filters, setFilters] = useState<FilterConfig[]>([]);
   const [selectedChart, setSelectedChart] = useState<string | null>(null);
 
-  // ✅ only pick dataset if user selected one
-  const currentSource =
-    activeDatasetId !== null
-      ? dataSources.find((ds) => ds.id === activeDatasetId)
-      : null;
+  // ✅ Only pick dataset if user explicitly selected one
+  const currentSource = activeDatasetId
+    ? dataSources.find((ds) => ds.tableName === activeDatasetId)
+    : null;
 
   const currentData = currentSource
     ? {
-        sourceId: currentSource.id,
+        sourceId: currentSource.tableName,
         query: currentSource.query ?? "SELECT * FROM data",
         results: currentSource.data ?? currentSource.results ?? [],
         columns: currentSource.columns ?? [],
@@ -60,28 +60,22 @@ export function WebBuilder({ activeTab, setActiveTab }: WebBuilderProps) {
       }
     : null;
 
+  // ✅ Add Chart without pre-selecting columns
   const handleAddChart = (chartType: ChartConfig["type"]) => {
-    if (!currentData) return;
+    if (!currentData) {
+      alert("Please select a dataset before adding charts.");
+      return;
+    }
 
     const results = currentData.results ?? [];
-
-    const numericCols =
-      currentData.columns?.filter((c: any) => c.type === "number") ?? [];
-    const categoricalCols =
-      currentData.columns?.filter((c: any) => c.type === "string") ?? [];
-
-    const x =
-      categoricalCols[0]?.name ?? currentData.columns?.[0]?.name ?? "x";
-    const y =
-      numericCols[0]?.name ?? currentData.columns?.[1]?.name ?? "y";
 
     const newChart: ChartConfig = {
       id: `chart-${Date.now()}`,
       type: chartType,
       title: `${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart`,
       data: results,
-      x,
-      y,
+      x: "", // user will pick later
+      y: "", // user will pick later
       position: { x: charts.length * 48, y: charts.length * 48 },
       size: { width: 420, height: 300 },
       filters: {},
@@ -92,11 +86,16 @@ export function WebBuilder({ activeTab, setActiveTab }: WebBuilderProps) {
     setActiveTab("dashboard");
   };
 
+  // expose addChart so sidebar button can call it
+  if (addChartRef) {
+    addChartRef.current = () => handleAddChart("bar");
+  }
+
   const renderContent = () => {
     if (!currentData) {
       return (
-        <div className="flex items-center justify-center h-full text-muted-foreground">
-          Select a dataset to start building your dashboard
+        <div className="h-full flex items-center justify-center text-muted-foreground">
+          Please select a dataset to start building your dashboard.
         </div>
       );
     }
@@ -159,9 +158,7 @@ export function WebBuilder({ activeTab, setActiveTab }: WebBuilderProps) {
                 onAddChart={handleAddChart}
                 onUpdateChart={(id, updates) =>
                   setCharts((prev) =>
-                    prev.map((c) =>
-                      c.id === id ? { ...c, ...updates } : c
-                    )
+                    prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
                   )
                 }
                 onDeleteChart={(id) =>
@@ -191,7 +188,7 @@ export function WebBuilder({ activeTab, setActiveTab }: WebBuilderProps) {
           >
             <option value="">-- Select Dataset --</option>
             {dataSources.map((ds) => (
-              <option key={ds.id} value={ds.id}>
+              <option key={ds.id} value={ds.tableName}>
                 {ds.name}
               </option>
             ))}
