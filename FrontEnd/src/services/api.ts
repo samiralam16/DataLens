@@ -185,3 +185,22 @@ export const getSnapshotPreview = async (
   if (!res.ok) throw new Error("Failed to fetch snapshot preview");
   return res.json();
 };
+
+// ----------------------
+// 🔥 Unified Sources API (datasets + snapshots)
+// ----------------------
+export interface DataSource {
+  id: number;
+  name: string;
+  type: "dataset" | "snapshot";
+  rows: number;
+  file_type: string;
+  filename?: string; // dataset only
+  result_table?: string; // snapshot only
+}
+
+export const listAllSources = async (): Promise<{ sources: DataSource[] }> => {
+  const res = await fetch(`${API_BASE_URL}/query/all-sources`);
+  if (!res.ok) throw new Error("Failed to fetch sources");
+  return res.json();
+};
