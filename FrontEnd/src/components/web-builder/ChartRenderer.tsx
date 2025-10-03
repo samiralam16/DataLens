@@ -41,6 +41,17 @@ export function ChartRenderer({ chart, height = 300 }: ChartRendererProps) {
     margin: { top: 5, right: 30, left: 20, bottom: 5 }
   };
 
+  if (!chart.x || !chart.y) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground">
+        <div className="text-center">
+          <div className="text-4xl mb-2">⚙️</div>
+          <p className="text-sm">Select X and Y columns to render this chart</p>
+        </div>
+      </div>
+    );
+  };
+
   switch (chart.type) {
     case 'bar':
       return (

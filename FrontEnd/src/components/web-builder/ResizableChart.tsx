@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Settings, Trash2, Move, Maximize2 } from 'lucide-react';
+import { Settings, Trash2, Move } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { ChartConfig } from '../WebBuilder';
@@ -17,7 +17,7 @@ interface ResizableChartProps {
   chart: ChartConfig;
   isSelected: boolean;
   onSelect: () => void;
-  onUpdate: (updates: Partial<ChartConfig>) => void;
+  onUpdate: (updates: Partial<ChartConfig>, mode?: 'preview' | 'apply' | 'cancel') => void;
   onDelete: () => void;
   isGridMode: boolean;
 }
@@ -89,9 +89,7 @@ export function ResizableChart({
         const newX = Math.max(0, e.clientX - containerRect.left - dragOffset.x);
         const newY = Math.max(0, e.clientY - containerRect.top - dragOffset.y);
         
-        onUpdate({
-          position: { x: newX, y: newY }
-        });
+        onUpdate({ position: { x: newX, y: newY } }, 'preview');
       }
     } else if (isResizing && !isGridMode) {
       const deltaX = e.clientX - resizeStart.mouseX;
@@ -102,41 +100,40 @@ export function ResizableChart({
       let newX = resizeStart.x;
       let newY = resizeStart.y;
 
-      // Handle different resize directions
       switch (resizeDirection) {
-        case 'e': // East (right edge)
+        case 'e':
           newWidth = Math.max(200, resizeStart.width + deltaX);
           break;
-        case 'w': // West (left edge)
+        case 'w':
           newWidth = Math.max(200, resizeStart.width - deltaX);
           newX = Math.max(0, resizeStart.x + deltaX);
           if (newWidth === 200) newX = resizeStart.x + resizeStart.width - 200;
           break;
-        case 's': // South (bottom edge)
+        case 's':
           newHeight = Math.max(150, resizeStart.height + deltaY);
           break;
-        case 'n': // North (top edge)
+        case 'n':
           newHeight = Math.max(150, resizeStart.height - deltaY);
           newY = Math.max(0, resizeStart.y + deltaY);
           if (newHeight === 150) newY = resizeStart.y + resizeStart.height - 150;
           break;
-        case 'se': // Southeast (bottom-right corner)
+        case 'se':
           newWidth = Math.max(200, resizeStart.width + deltaX);
           newHeight = Math.max(150, resizeStart.height + deltaY);
           break;
-        case 'sw': // Southwest (bottom-left corner)
+        case 'sw':
           newWidth = Math.max(200, resizeStart.width - deltaX);
           newHeight = Math.max(150, resizeStart.height + deltaY);
           newX = Math.max(0, resizeStart.x + deltaX);
           if (newWidth === 200) newX = resizeStart.x + resizeStart.width - 200;
           break;
-        case 'ne': // Northeast (top-right corner)
+        case 'ne':
           newWidth = Math.max(200, resizeStart.width + deltaX);
           newHeight = Math.max(150, resizeStart.height - deltaY);
           newY = Math.max(0, resizeStart.y + deltaY);
           if (newHeight === 150) newY = resizeStart.y + resizeStart.height - 150;
           break;
-        case 'nw': // Northwest (top-left corner)
+        case 'nw':
           newWidth = Math.max(200, resizeStart.width - deltaX);
           newHeight = Math.max(150, resizeStart.height - deltaY);
           newX = Math.max(0, resizeStart.x + deltaX);
@@ -146,10 +143,10 @@ export function ResizableChart({
           break;
       }
       
-      onUpdate({
-        size: { width: newWidth, height: newHeight },
-        position: { x: newX, y: newY }
-      });
+      onUpdate(
+        { size: { width: newWidth, height: newHeight }, position: { x: newX, y: newY } },
+        'preview'
+      );
     }
   }, [isDragging, isResizing, isGridMode, dragOffset, resizeStart, resizeDirection, onUpdate]);
 
@@ -158,7 +155,6 @@ export function ResizableChart({
     setIsResizing(false);
   }, []);
 
-  // Add global mouse event listeners
   useEffect(() => {
     if (isDragging || isResizing) {
       document.addEventListener('mousemove', handleMouseMove);
@@ -171,7 +167,6 @@ export function ResizableChart({
     }
   }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
 
-  // Resize handle component
   const ResizeHandle = ({ direction, className, cursor }: { 
     direction: ResizeDirection; 
     className: string; 
@@ -184,6 +179,17 @@ export function ResizableChart({
       onClick={(e) => e.stopPropagation()}
     />
   );
+
+  // ✅ Helper to properly forward ChartConfigPanel events
+  const handleConfigUpdate = (mode: 'preview' | 'apply' | 'cancel', updates: Partial<ChartConfig>) => {
+    if (mode === 'apply') {
+      onUpdate(updates, 'apply');
+    } else if (mode === 'cancel') {
+      onUpdate({}, 'cancel');
+    } else {
+      onUpdate(updates, 'preview');
+    }
+  };
 
   if (isGridMode) {
     return (
@@ -203,14 +209,13 @@ export function ResizableChart({
                     <Settings className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent>
-                  <SheetHeader>
+                <SheetContent side="right" className="w-[420px] sm:w-[480px] p-0 flex flex-col">
+                  <SheetHeader className="p-4">
                     <SheetTitle>Chart Configuration</SheetTitle>
                   </SheetHeader>
-                  <ChartConfigPanel
-                    chart={chart}
-                    onUpdateChart={(_, updates) => onUpdate(updates)}
-                  />
+                  <div className="flex-1 overflow-hidden">
+                    <ChartConfigPanel chart={chart} onUpdateChart={handleConfigUpdate} />
+                  </div>
                 </SheetContent>
               </Sheet>
               
@@ -268,14 +273,13 @@ export function ResizableChart({
                   <Settings className="h-3 w-3" />
                 </Button>
               </SheetTrigger>
-              <SheetContent>
-                <SheetHeader>
+              <SheetContent side="right" className="w-[420px] sm:w-[480px] p-0 flex flex-col">
+                <SheetHeader className="p-4">
                   <SheetTitle>Chart Configuration</SheetTitle>
                 </SheetHeader>
-                <ChartConfigPanel
-                  chart={chart}
-                  onUpdateChart={(_, updates) => onUpdate(updates)}
-                />
+                <div className="flex-1 overflow-hidden">
+                  <ChartConfigPanel chart={chart} onUpdateChart={handleConfigUpdate} />
+                </div>
               </SheetContent>
             </Sheet>
             
@@ -299,58 +303,19 @@ export function ResizableChart({
         </div>
       </CardContent>
       
-      {/* Enhanced Resize Handles - Only show when selected */}
       {isSelected && !isGridMode && (
         <>
-          {/* Corner handles */}
-          <ResizeHandle 
-            direction="se" 
-            className="bottom-0 right-0 w-3 h-3 rounded-tl-md"
-            cursor="se-resize"
-          />
-          <ResizeHandle 
-            direction="sw" 
-            className="bottom-0 left-0 w-3 h-3 rounded-tr-md"
-            cursor="sw-resize"
-          />
-          <ResizeHandle 
-            direction="ne" 
-            className="top-0 right-0 w-3 h-3 rounded-bl-md"
-            cursor="ne-resize"
-          />
-          <ResizeHandle 
-            direction="nw" 
-            className="top-0 left-0 w-3 h-3 rounded-br-md"
-            cursor="nw-resize"
-          />
-          
-          {/* Edge handles for width adjustment */}
-          <ResizeHandle 
-            direction="e" 
-            className="top-1/2 right-0 w-2 h-8 -translate-y-1/2 rounded-l-md"
-            cursor="e-resize"
-          />
-          <ResizeHandle 
-            direction="w" 
-            className="top-1/2 left-0 w-2 h-8 -translate-y-1/2 rounded-r-md"
-            cursor="w-resize"
-          />
-          
-          {/* Edge handles for height adjustment */}
-          <ResizeHandle 
-            direction="s" 
-            className="bottom-0 left-1/2 h-2 w-8 -translate-x-1/2 rounded-t-md"
-            cursor="s-resize"
-          />
-          <ResizeHandle 
-            direction="n" 
-            className="top-0 left-1/2 h-2 w-8 -translate-x-1/2 rounded-b-md"
-            cursor="n-resize"
-          />
+          <ResizeHandle direction="se" className="bottom-0 right-0 w-3 h-3 rounded-tl-md" cursor="se-resize" />
+          <ResizeHandle direction="sw" className="bottom-0 left-0 w-3 h-3 rounded-tr-md" cursor="sw-resize" />
+          <ResizeHandle direction="ne" className="top-0 right-0 w-3 h-3 rounded-bl-md" cursor="ne-resize" />
+          <ResizeHandle direction="nw" className="top-0 left-0 w-3 h-3 rounded-br-md" cursor="nw-resize" />
+          <ResizeHandle direction="e" className="top-1/2 right-0 w-2 h-8 -translate-y-1/2 rounded-l-md" cursor="e-resize" />
+          <ResizeHandle direction="w" className="top-1/2 left-0 w-2 h-8 -translate-y-1/2 rounded-r-md" cursor="w-resize" />
+          <ResizeHandle direction="s" className="bottom-0 left-1/2 h-2 w-8 -translate-x-1/2 rounded-t-md" cursor="s-resize" />
+          <ResizeHandle direction="n" className="top-0 left-1/2 h-2 w-8 -translate-x-1/2 rounded-b-md" cursor="n-resize" />
         </>
       )}
       
-      {/* Visual feedback for selection */}
       {isSelected && !isGridMode && (
         <div className="absolute inset-0 border-2 border-primary rounded-lg pointer-events-none opacity-30" />
       )}
