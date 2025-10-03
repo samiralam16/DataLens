@@ -47,10 +47,11 @@ export function Sidebar({
 
   // Web Builder items
   const webBuilderItems: NavItem[] = [
-    { icon: Home, label: "Dashboard", id: "dashboard", onClick: () => onChangeTab?.("dashboard") },
-    { icon: Filter, label: "Filters & Data", id: "filters", onClick: () => onChangeTab?.("filters") },
-    { icon: Share2, label: "Export & Share", id: "export", onClick: () => onChangeTab?.("export") },
-    { icon: Settings, label: "Settings", id: "settings", onClick: () => onChangeTab?.("settings") },
+  { icon: Home, label: "Dashboard", id: "dashboard", onClick: () => onChangeTab?.("dashboard") },
+  { icon: Database, label: "Chart Library", id: "charts", onClick: () => onChangeTab?.("charts") },
+  { icon: Share2, label: "Export & Share", id: "export", onClick: () => onChangeTab?.("export") },
+  { icon: Filter, label: "Filters & Data", id: "filters", onClick: () => onChangeTab?.("filters") },
+  { icon: Settings, label: "Settings", id: "settings", onClick: () => onChangeTab?.("settings") },
   ];
 
   const items = activeModule === "sql" ? sqlBuilderItems : webBuilderItems;
