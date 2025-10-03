@@ -1,4 +1,3 @@
-// WebBuilder.tsx
 import { useState, useEffect, MutableRefObject } from 'react';
 import { DashboardBuilder } from './web-builder/DashboardBuilder';
 import { ChartLibrary } from './web-builder/ChartLibrary';
@@ -40,8 +39,12 @@ interface WebBuilderProps {
 }
 
 export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderProps) {
-  const { analyzedData, dataSources, setAnalyzedData, setActiveDataset, activeDatasetId } = useData();
-  const [charts, setCharts] = useState<ChartConfig[]>([]);
+  const { analyzedData, dataSources, setAnalyzedData, setActiveDataset, activeDatasetId, getDashboard, saveDashboard } = useData();
+
+  // ✅ initialize charts from context once
+  const [charts, setCharts] = useState<ChartConfig[]>(
+    () => (activeDatasetId ? getDashboard(activeDatasetId) : [])
+  );
   const [filters, setFilters] = useState<FilterConfig[]>([]);
   const [selectedChart, setSelectedChart] = useState<string | null>(null);
 
@@ -64,8 +67,16 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
         columns: lastDataset.columns,
         timestamp: new Date(),
       });
+      setCharts(getDashboard(lastDataset.id)); // restore charts if any
     }
-  }, [dataSources, activeDatasetId, setActiveDataset, setAnalyzedData]);
+  }, [dataSources, activeDatasetId, setActiveDataset, setAnalyzedData, getDashboard]);
+
+  // ✅ save to context whenever charts change
+  useEffect(() => {
+    if (activeDatasetId) {
+      saveDashboard(activeDatasetId, charts);
+    }
+  }, [charts, activeDatasetId, saveDashboard]);
 
   // ✅ handle dataset selection change
   const handleDatasetChange = (datasetId: string) => {
@@ -79,8 +90,9 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
         columns: ds.columns,
         timestamp: new Date(),
       });
-      setCharts([]);   // clear old charts when switching dataset
-      setFilters([]);  // reset filters
+      setCharts(getDashboard(datasetId)); // ✅ restore dashboard
+      setFilters([]);
+      setSelectedChart(null); // ✅ clear selection when switching dataset
     }
   };
 
@@ -92,8 +104,8 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
       type: chartType,
       title: `${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart`,
       data: currentData.results,
-      x: '',   // leave empty until user picks
-      y: '',   // leave empty until user picks
+      x: '',
+      y: '',
       position: { x: charts.length * 50, y: charts.length * 50 },
       size: { width: 400, height: 300 },
       filters: {},
@@ -103,7 +115,6 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     setSelectedChart(newChart.id);
   };
 
-  // ✅ updated to handle both preview + apply
   const handleUpdateChart = (
     chartId: string,
     updates: Partial<ChartConfig>,
@@ -116,7 +127,6 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     );
 
     if (mode === 'apply') {
-      // 🔹 here you could persist to backend if needed
       console.log(`Chart ${chartId} saved with updates:`, updates);
     }
   };
