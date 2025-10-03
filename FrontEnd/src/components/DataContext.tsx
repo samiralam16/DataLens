@@ -7,6 +7,7 @@ import {
   listSnapshots, 
   getSnapshotPreview 
 } from '../services/api';
+import { ChartConfig, FilterConfig } from '../WebBuilder';
 
 export interface DataSource {
   id: string;
@@ -31,7 +32,7 @@ interface DataContextType {
   dataSources: DataSource[];
   analyzedData: AnalyzedData | null;
   datasets: Dataset[];
-  snapshots: any[];   // ✅ expose snapshots separately
+  snapshots: any[];
   loading: boolean;
   activeDatasetId: string | null;
   activeModule: 'sql' | 'web';
@@ -44,6 +45,11 @@ interface DataContextType {
   updateDataSource: (id: string, partial: Partial<DataSource>) => void;
   removeDataSource: (id: string) => void;
   addDatasetAsSource: (dataset: Dataset) => void;
+
+  // ✅ new: dashboard persistence
+  getDashboard: (datasetId: string) => ChartConfig[];
+  saveDashboard: (datasetId: string, charts: ChartConfig[]) => void;
+  clearDashboard: (datasetId: string) => void;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -61,6 +67,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [activeModule, setActiveModuleState] = useState<'sql' | 'web'>(() =>
     (localStorage.getItem("activeModule") as 'sql' | 'web') || 'sql'
   );
+
+  // ✅ dashboards kept in memory only
+  const [dashboards, setDashboards] = useState<Record<string, ChartConfig[]>>({});
 
   useEffect(() => {
     if (activeDatasetId) localStorage.setItem("activeDatasetId", activeDatasetId);
@@ -91,7 +100,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setDatasets(backendDatasets);
       setSnapshots(backendSnapshots);
 
-      // Convert datasets
       const datasetSources: DataSource[] = await Promise.all(
         backendDatasets.map(async (dataset) => {
           const columns = parseColumnsInfo(dataset.columns_info);
@@ -120,7 +128,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
         })
       );
 
-      // Convert snapshots (patch for columns array format)
       const snapshotSources: DataSource[] = await Promise.all(
         backendSnapshots.map(async (snap) => {
           let preview: any = { columns: [], preview: [], rows: 0 };
@@ -185,6 +192,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setDataSources(prev => [...prev, newSource]);
   };
 
+  // ✅ new dashboard handlers
+  const getDashboard = (datasetId: string) => dashboards[datasetId] || [];
+  const saveDashboard = (datasetId: string, charts: ChartConfig[]) => {
+    setDashboards(prev => ({ ...prev, [datasetId]: charts }));
+  };
+  const clearDashboard = (datasetId: string) => {
+    setDashboards(prev => {
+      const { [datasetId]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
   return (
     <DataContext.Provider value={{
       dataSources,
@@ -201,7 +220,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addDataSource,
       updateDataSource,
       removeDataSource,
-      addDatasetAsSource
+      addDatasetAsSource,
+      getDashboard,
+      saveDashboard,
+      clearDashboard
     }}>
       {children}
     </DataContext.Provider>
