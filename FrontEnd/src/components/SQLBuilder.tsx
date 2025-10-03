@@ -32,14 +32,15 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
     setAnalyzedData,
     activeDatasetId,
     setActiveDataset,
-    setActiveModule,
-    dataSources
+    setActiveModule
   } = useData();
 
   const [activeQuery, setActiveQuery] = useState("");
   const [queryResults, setQueryResults] = useState<any[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [activeTab, setActiveTab] = useState<"editor" | "import" | "saved" | "sources">("editor");
+  const [activeTab, setActiveTab] = useState<
+    "editor" | "import" | "saved" | "sources"
+  >("editor");
 
   // ✅ Mark SQL module active
   useEffect(() => {
@@ -83,12 +84,21 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
         originalName: col,
       }));
 
-      // ✅ Use dataset table name
-      const datasetName = `query_result_${Date.now()}`;
-      setActiveDataset(datasetName);
+      // ✅ New dataset name for query result
+      const datasetId = `query_result_${Date.now()}`;
+
+// Try to detect the table name from the query (optional)
+const match = query.match(/from\s+([a-zA-Z0-9_]+)/i);
+const tableRef = match ? match[1] : null;
+
+const friendlyName = tableRef
+        ? `Query on ${tableRef} (${result.rows_returned} rows)`
+        : `Unsaved Query Result (${result.rows_returned} rows)`;
+
+      setActiveDataset(datasetId);
 
       setAnalyzedData({
-        sourceId: datasetName,
+        sourceId: datasetId,
         query,
         results: result.data,
         columns,
@@ -102,6 +112,22 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
     } finally {
       setIsExecuting(false);
     }
+  };
+
+  // ✅ Handle CSV Import (shared logic)
+  const handleImport = (fileName: string, rows: any[], cols: any[]) => {
+    const dsId = fileName.replace(/\s+/g, "_").toLowerCase();
+    setActiveDataset(dsId);
+
+    setAnalyzedData({
+      sourceId: dsId,
+      query: "",
+      results: rows,
+      columns: cols,
+      timestamp: new Date(),
+    });
+
+    toast.success(`CSV "${fileName}" imported (${rows.length} rows).`);
   };
 
   // ✅ Editor view
@@ -149,21 +175,7 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
           </ResizablePanelGroup>
         )}
 
-        {activeTab === "import" && (
-          <DataImport
-            onImport={(fileName, rows, cols) => {
-              setActiveDataset(fileName.replace(/\s+/g, "_").toLowerCase());
-              setAnalyzedData({
-                sourceId: fileName,
-                query: "",
-                results: rows,
-                columns: cols,
-                timestamp: new Date(),
-              });
-              toast.success(`CSV "${fileName}" imported (${rows.length} rows).`);
-            }}
-          />
-        )}
+        {activeTab === "import" && <DataImport onImport={handleImport} />}
 
         {activeTab === "saved" && (
           <SavedQueries
@@ -183,21 +195,7 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
     <div className="h-full flex">
       <div className="flex-1 flex flex-col">
         {activeTool === "editor" && renderEditor()}
-        {activeTool === "import" && (
-          <DataImport
-            onImport={(fileName, rows, cols) => {
-              setActiveDataset(fileName.replace(/\s+/g, "_").toLowerCase());
-              setAnalyzedData({
-                sourceId: fileName,
-                query: "",
-                results: rows,
-                columns: cols,
-                timestamp: new Date(),
-              });
-              toast.success(`CSV "${fileName}" imported (${rows.length} rows).`);
-            }}
-          />
-        )}
+        {activeTool === "import" && <DataImport onImport={handleImport} />}
         {activeTool === "queries" && (
           <SavedQueries
             goToEditor={() => {
