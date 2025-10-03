@@ -1,3 +1,4 @@
+// WebBuilder.tsx
 import { useState, useRef, useEffect, MutableRefObject } from 'react';
 import { DashboardBuilder } from './web-builder/DashboardBuilder';
 import { ChartLibrary } from './web-builder/ChartLibrary';
@@ -31,16 +32,17 @@ export interface FilterConfig {
 
 interface WebBuilderProps {
   addChartRef: MutableRefObject<(() => void) | null>;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
 }
 
-export function WebBuilder({ addChartRef }: WebBuilderProps) {
+export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderProps) {
   const { analyzedData, dataSources } = useData();
   const [charts, setCharts] = useState<ChartConfig[]>([]);
   const [filters, setFilters] = useState<FilterConfig[]>([]);
   const [selectedChart, setSelectedChart] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'charts' | 'export'>('dashboard');
 
-  // Get current data from context (analyzed data takes priority)
+  // Get current data
   const currentData = analyzedData || (dataSources.length > 0 ? {
     sourceId: dataSources[0].id,
     query: 'SELECT * FROM data',
@@ -50,16 +52,13 @@ export function WebBuilder({ addChartRef }: WebBuilderProps) {
   } : null);
 
   const handleAddChart = (chartType: ChartConfig['type']) => {
-    if (!currentData || currentData.results.length === 0) {
-      return;
-    }
+    if (!currentData || currentData.results.length === 0) return;
 
-    // Find appropriate columns for the chart
     const numericColumns = currentData.columns.filter(col => col.type === 'number');
     const categoricalColumns = currentData.columns.filter(col => col.type === 'string');
-    
-    const xColumn = categoricalColumns.length > 0 ? categoricalColumns[0].name : currentData.columns[0]?.name;
-    const yColumn = numericColumns.length > 0 ? numericColumns[0].name : currentData.columns[1]?.name || currentData.columns[0]?.name;
+
+    const xColumn = categoricalColumns[0]?.name || currentData.columns[0]?.name;
+    const yColumn = numericColumns[0]?.name || currentData.columns[1]?.name || currentData.columns[0]?.name;
 
     const newChart: ChartConfig = {
       id: `chart-${Date.now()}`,
@@ -77,43 +76,22 @@ export function WebBuilder({ addChartRef }: WebBuilderProps) {
     setSelectedChart(newChart.id);
   };
 
-  // Connect sidebar Add Chart button to default bar chart
-  const handleSidebarAddChart = () => {
-    handleAddChart('bar');
-  };
-
-  // Set up the ref so sidebar can call the function
-  useEffect(() => {
-    addChartRef.current = handleSidebarAddChart;
-  }, [addChartRef, handleSidebarAddChart]);
-
   const handleUpdateChart = (chartId: string, updates: Partial<ChartConfig>) => {
-    setCharts(prev => prev.map(chart => 
-      chart.id === chartId ? { ...chart, ...updates } : chart
-    ));
+    setCharts(prev => prev.map(chart => chart.id === chartId ? { ...chart, ...updates } : chart));
   };
 
   const handleDeleteChart = (chartId: string) => {
     setCharts(prev => prev.filter(chart => chart.id !== chartId));
-    if (selectedChart === chartId) {
-      setSelectedChart(null);
-    }
+    if (selectedChart === chartId) setSelectedChart(null);
   };
 
   const handleAddFilter = (filterConfig: Omit<FilterConfig, 'id'>) => {
-    const newFilter: FilterConfig = {
-      ...filterConfig,
-      id: `filter-${Date.now()}`
-    };
+    const newFilter: FilterConfig = { ...filterConfig, id: `filter-${Date.now()}` };
     setFilters(prev => [...prev, newFilter]);
   };
 
   const handleUpdateFilter = (filterId: string, updates: Partial<FilterConfig>) => {
-    setFilters(prev => prev.map(filter => 
-      filter.id === filterId ? { ...filter, ...updates } : filter
-    ));
-    
-    // Apply filter to all charts
+    setFilters(prev => prev.map(filter => filter.id === filterId ? { ...filter, ...updates } : filter));
     const filter = filters.find(f => f.id === filterId);
     if (filter) {
       setCharts(prev => prev.map(chart => ({
@@ -127,84 +105,83 @@ export function WebBuilder({ addChartRef }: WebBuilderProps) {
     setFilters(prev => prev.filter(filter => filter.id !== filterId));
   };
 
+  // Main content rendering
   const renderContent = () => {
-    switch (activeTab) {
-      case 'charts':
-        return (
-          <ChartLibrary
-            onAddChart={handleAddChart}
-            existingCharts={charts}
-            onUpdateChart={handleUpdateChart}
-          />
-        );
-      case 'export':
-        return (
-          <ExportShare
-            charts={charts}
-            filters={filters}
-          />
-        );
-      default:
-        return (
-          <ResizablePanelGroup direction="horizontal" className="h-full">
-            <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
-              <FilterPanel
-                filters={filters}
-                onAddFilter={handleAddFilter}
-                onUpdateFilter={handleUpdateFilter}
-                onDeleteFilter={handleDeleteFilter}
-              />
-            </ResizablePanel>
-            <ResizableHandle />
-            <ResizablePanel defaultSize={60} minSize={40}>
-              <DashboardBuilder
-                charts={charts}
-                selectedChart={selectedChart}
-                onSelectChart={setSelectedChart}
-                onAddChart={handleAddChart}
-                onUpdateChart={handleUpdateChart}
-                onDeleteChart={handleDeleteChart}
-                filters={filters}
-              />
-            </ResizablePanel>
-            <ResizableHandle />
-            <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
-              <ColumnsPanel />
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        );
-    }
-  };
+      switch (activeTab) {
+        case 'charts':
+          return (
+            <ChartLibrary
+              onAddChart={handleAddChart}
+              existingCharts={charts}
+              onUpdateChart={handleUpdateChart}
+            />
+          );
+
+        case 'export':
+          return (
+            <ExportShare
+              charts={charts}
+              filters={filters}
+            />
+          );
+
+        case 'filters':
+          return (
+            <ResizablePanelGroup direction="horizontal" className="h-full">
+              {/* Left: Filters */}
+              <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
+                <FilterPanel
+                  filters={filters}
+                  onAddFilter={handleAddFilter}
+                  onUpdateFilter={handleUpdateFilter}
+                  onDeleteFilter={handleDeleteFilter}
+                />
+              </ResizablePanel>
+              <ResizableHandle />
+              {/* Right: Columns */}
+              <ResizablePanel defaultSize={75} minSize={40}>
+                <ColumnsPanel />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          );
+
+        case 'settings':
+          return (
+            <div className="p-6 text-sm text-muted-foreground">
+              <h3 className="text-lg font-semibold mb-2">Settings</h3>
+              <p>Settings panel coming soon…</p>
+            </div>
+          );
+
+        default: // dashboard
+          return (
+            <ResizablePanelGroup direction="horizontal" className="h-full">
+              {/* Main dashboard builder */}
+              <ResizablePanel defaultSize={75} minSize={50}>
+                <DashboardBuilder
+                  charts={charts}
+                  selectedChart={selectedChart}
+                  onSelectChart={setSelectedChart}
+                  onAddChart={handleAddChart}
+                  onUpdateChart={handleUpdateChart}
+                  onDeleteChart={handleDeleteChart}
+                  filters={filters}
+                />
+              </ResizablePanel>
+              <ResizableHandle />
+              {/* Right: Columns */}
+              <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
+                <ColumnsPanel />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          );
+      }
+    };
+
 
   return (
     <div className="h-full flex flex-col">
-      {/* Tab Navigation */}
-      <div className="border-b border-border p-4">
-        <div className="flex items-center gap-1">
-          {[
-            { key: 'dashboard', label: 'Dashboard' },
-            { key: 'charts', label: 'Chart Library' },
-            { key: 'export', label: 'Export & Share' }
-          ].map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key as any)}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                activeTab === key 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-      
-      {/* Content */}
-      <div className="flex-1">
-        {renderContent()}
-      </div>
+      <div className="flex-1">{renderContent()}</div>
     </div>
   );
 }
