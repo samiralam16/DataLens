@@ -31,6 +31,7 @@ interface DataContextType {
   dataSources: DataSource[];
   analyzedData: AnalyzedData | null;
   datasets: Dataset[];
+  snapshots: any[];   // ✅ expose snapshots separately
   loading: boolean;
   activeDatasetId: string | null;
   activeModule: 'sql' | 'web';
@@ -50,6 +51,7 @@ const DataContext = createContext<DataContextType | null>(null);
 export function DataProvider({ children }: { children: ReactNode }) {
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
   const [datasets, setDatasets] = useState<Dataset[]>([]);
+  const [snapshots, setSnapshots] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzedData, setAnalyzedData] = useState<AnalyzedData | null>(null);
 
@@ -87,6 +89,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const backendDatasets = await listDatasets();
       const backendSnapshots = await listSnapshots();
       setDatasets(backendDatasets);
+      setSnapshots(backendSnapshots);
 
       // Convert datasets
       const datasetSources: DataSource[] = await Promise.all(
@@ -117,15 +120,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
         })
       );
 
-      // Convert snapshots
+      // Convert snapshots (patch for columns array format)
       const snapshotSources: DataSource[] = await Promise.all(
         backendSnapshots.map(async (snap) => {
-          let preview: any = { columns: [], rows: [] };
+          let preview: any = { columns: [], preview: [], rows: 0 };
           try {
             preview = await getSnapshotPreview(snap.id, 20);
           } catch (err) {
             console.warn("Preview fetch failed for snapshot", snap.snapshot_name, err);
           }
+
+          const rows = preview.preview || [];
+          const cols = (preview.columns || []).map((c: any) => {
+            return typeof c === "string"
+              ? { name: c, type: inferColumnType(c, rows), originalName: c }
+              : { name: c.name, type: inferColumnType(c.name, rows), originalName: c.name };
+          });
 
           return {
             id: `snapshot-${snap.id}`,
@@ -133,12 +143,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
             tableName: snap.result_table,
             type: 'snapshot',
             status: 'connected',
-            data: preview.rows || [],
-            columns: (preview.columns || []).map(c => ({
-              name: c.name,
-              type: inferColumnType(c.name, preview.rows || []),
-              originalName: c.name
-            })),
+            data: rows,
+            columns: cols,
             backendDataset: null
           };
         })
@@ -184,6 +190,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dataSources,
       analyzedData,
       datasets,
+      snapshots,
       loading,
       activeDatasetId,
       activeModule,
