@@ -11,7 +11,6 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Calendar } from '../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Badge } from '../ui/badge';
-import { Separator } from '../ui/separator';
 import { 
   Dialog, 
   DialogContent, 
@@ -24,6 +23,7 @@ import {
 import { FilterConfig } from '../WebBuilder';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
+import { useData } from '../DataContext';  // ✅ import context
 
 interface FilterPanelProps {
   filters: FilterConfig[];
@@ -41,21 +41,17 @@ export function FilterPanel({ filters, onAddFilter, onUpdateFilter, onDeleteFilt
     value: null
   });
 
-  // Mock data columns for filter creation
-  const availableColumns = [
-    { name: 'region', type: 'text', values: ['North', 'South', 'East', 'West'] },
-    { name: 'month', type: 'text', values: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'] },
-    { name: 'revenue', type: 'number', range: { min: 0, max: 100000 } },
-    { name: 'orders', type: 'number', range: { min: 0, max: 200 } },
-    { name: 'date', type: 'date' }
-  ];
+  // ✅ Get active dataset columns dynamically
+  const { dataSources, activeDatasetId } = useData();
+  const activeDataset = dataSources.find(ds => ds.id === activeDatasetId);
+  const availableColumns = activeDataset?.columns || [];  // ✅ replaces hardcoded
 
   const handleAddFilter = () => {
     if (newFilter.label && newFilter.column) {
       const column = availableColumns.find(col => col.name === newFilter.column);
       const filterConfig: Omit<FilterConfig, 'id'> = {
         ...newFilter,
-        options: column?.values,
+        options: column?.values,   // only if values exist in column
         range: column?.range,
         value: getDefaultValue(newFilter.type, column)
       };
@@ -373,11 +369,17 @@ export function FilterPanel({ filters, onAddFilter, onUpdateFilter, onDeleteFilt
 
       {filters.length > 0 && (
         <div className="border-t border-border p-4">
-          <Button variant="outline" size="sm" className="w-full" onClick={() => {
-            filters.forEach(filter => {
-              onUpdateFilter(filter.id, { value: getDefaultValue(filter.type, availableColumns.find(col => col.name === filter.column)) });
-            });
-          }}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => {
+              filters.forEach(filter => {
+                const col = availableColumns.find(c => c.name === filter.column);
+                onUpdateFilter(filter.id, { value: getDefaultValue(filter.type, col) });
+              });
+            }}
+          >
             Reset All Filters
           </Button>
         </div>

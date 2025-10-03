@@ -87,22 +87,13 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
   const handleAddChart = (chartType: ChartConfig['type']) => {
     if (!currentData || currentData.results.length === 0) return;
 
-    const numericColumns = currentData.columns.filter((col) => col.type === 'number');
-    const categoricalColumns = currentData.columns.filter((col) => col.type === 'string');
-
-    const xColumn = categoricalColumns[0]?.name || currentData.columns[0]?.name;
-    const yColumn =
-      numericColumns[0]?.name ||
-      currentData.columns[1]?.name ||
-      currentData.columns[0]?.name;
-
     const newChart: ChartConfig = {
       id: `chart-${Date.now()}`,
       type: chartType,
       title: `${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart`,
       data: currentData.results,
-      x: xColumn,
-      y: yColumn,
+      x: '',   // leave empty until user picks
+      y: '',   // leave empty until user picks
       position: { x: charts.length * 50, y: charts.length * 50 },
       size: { width: 400, height: 300 },
       filters: {},
@@ -112,10 +103,22 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     setSelectedChart(newChart.id);
   };
 
-  const handleUpdateChart = (chartId: string, updates: Partial<ChartConfig>) => {
+  // ✅ updated to handle both preview + apply
+  const handleUpdateChart = (
+    chartId: string,
+    updates: Partial<ChartConfig>,
+    mode: 'preview' | 'apply' = 'apply'
+  ) => {
     setCharts((prev) =>
-      prev.map((chart) => (chart.id === chartId ? { ...chart, ...updates } : chart))
+      prev.map((chart) =>
+        chart.id === chartId ? { ...chart, ...updates } : chart
+      )
     );
+
+    if (mode === 'apply') {
+      // 🔹 here you could persist to backend if needed
+      console.log(`Chart ${chartId} saved with updates:`, updates);
+    }
   };
 
   const handleDeleteChart = (chartId: string) => {
