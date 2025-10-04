@@ -33,9 +33,8 @@ export function DashboardBuilder({
   const [isGridMode, setIsGridMode] = useState(true);
   const [gridCols, setGridCols] = useState(2);
 
-  // 🔑 store temporary edits (live preview)
+  // 🔑 temporary + rollback states
   const [tempEdits, setTempEdits] = useState<Record<string, Partial<ChartConfig>>>({});
-  // 🔑 store last applied state (for cancel rollback)
   const [lastApplied, setLastApplied] = useState<Record<string, ChartConfig>>({});
 
   const chartTypes: { type: ChartConfig['type']; label: string; icon: string }[] = [
@@ -48,29 +47,47 @@ export function DashboardBuilder({
     { type: 'geo', label: 'Geographic', icon: '🗺️' }
   ];
 
+  // ✅ safer filter application
   const applyFiltersToData = (chartData: any[], chartFilters: Record<string, any>) => {
+    if (!Array.isArray(chartData) || chartData.length === 0) return chartData;
+
     let filteredData = [...chartData];
+
     filters.forEach(filter => {
-      const filterValue = chartFilters[filter.column] || filter.value;
-      if (filterValue !== undefined && filterValue !== null) {
-        filteredData = filteredData.filter(row => {
-          switch (filter.type) {
-            case 'select':
-              return row[filter.column] === filterValue;
-            case 'checkbox':
-              return Array.isArray(filterValue) ? filterValue.includes(row[filter.column]) : row[filter.column] === filterValue;
-            case 'slider':
-              const value = Number(row[filter.column]);
-              return value >= filterValue.min && value <= filterValue.max;
-            case 'date':
-              const date = new Date(row[filter.column]);
-              return date >= new Date(filterValue.start) && date <= new Date(filterValue.end);
-            default:
-              return true;
-          }
-        });
-      }
+      const filterValue =
+        chartFilters[filter.column] !== undefined
+          ? chartFilters[filter.column]
+          : filter.value;
+
+      if (filterValue === undefined || filterValue === null) return;
+      if (!Object.prototype.hasOwnProperty.call(chartData[0], filter.column)) return;
+
+      filteredData = filteredData.filter(row => {
+        switch (filter.type) {
+          case 'select':
+            return row[filter.column] === filterValue;
+          case 'checkbox':
+            return Array.isArray(filterValue)
+              ? filterValue.includes(row[filter.column])
+              : row[filter.column] === filterValue;
+          case 'slider':
+            const value = Number(row[filter.column]);
+            return (
+              typeof filterValue === 'object' &&
+              value >= (filterValue.min ?? Number.MIN_VALUE) &&
+              value <= (filterValue.max ?? Number.MAX_VALUE)
+            );
+          case 'date':
+            const date = new Date(row[filter.column]);
+            const start = filterValue.start ? new Date(filterValue.start) : null;
+            const end = filterValue.end ? new Date(filterValue.end) : null;
+            return (!start || date >= start) && (!end || date <= end);
+          default:
+            return true;
+        }
+      });
     });
+
     return filteredData;
   };
 
@@ -84,16 +101,15 @@ export function DashboardBuilder({
     }
   };
 
-  // 🔑 Handle updates from ResizableChart / ConfigPanel
-  const handleChartUpdate = (chartId: string, updates: Partial<ChartConfig>, mode?: 'preview' | 'apply' | 'cancel') => {
+  const handleChartUpdate = (
+    chartId: string,
+    updates: Partial<ChartConfig>,
+    mode?: 'preview' | 'apply' | 'cancel'
+  ) => {
     if (mode === 'preview') {
-      setTempEdits(prev => ({
-        ...prev,
-        [chartId]: { ...prev[chartId], ...updates }
-      }));
+      setTempEdits(prev => ({ ...prev, [chartId]: { ...prev[chartId], ...updates } }));
       onUpdateChart(chartId, updates, 'preview');
-    } 
-    else if (mode === 'apply') {
+    } else if (mode === 'apply') {
       const finalUpdates = { ...tempEdits[chartId], ...updates };
       onUpdateChart(chartId, finalUpdates, 'apply');
       setLastApplied(prev => ({
@@ -104,9 +120,7 @@ export function DashboardBuilder({
         const { [chartId]: _, ...rest } = prev;
         return rest;
       });
-    } 
-    else if (mode === 'cancel') {
-      // restore last applied snapshot if available
+    } else if (mode === 'cancel') {
       if (lastApplied[chartId]) {
         onUpdateChart(chartId, lastApplied[chartId], 'cancel');
       }

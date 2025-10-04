@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
 # Import routers
-from routers import data_router, charts_router, analysis_router, query_router
+from routers import data_router, charts_router, analysis_router, query_router,dashboard_router
 from extensions import create_tables
 
 
@@ -40,6 +40,7 @@ def create_app():
     app.include_router(charts_router.router, prefix="/api/charts", tags=["Charts"])
     app.include_router(analysis_router.router, prefix="/api/analysis", tags=["Analysis"])
     app.include_router(query_router.router, prefix="/query", tags=["Query"])
+    app.include_router(dashboard_router.router, prefix="/api/dashboards", tags=["Dashboards"])
 
     return app
 

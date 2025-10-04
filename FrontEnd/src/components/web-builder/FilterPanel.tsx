@@ -1,5 +1,6 @@
+// src/components/web-builder/FilterPanel.tsx
 import { useState } from 'react';
-import { Plus, Settings, Trash2, Filter } from 'lucide-react';
+import { Plus, Settings, Trash2, Filter as FilterIcon } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
@@ -11,26 +12,18 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Calendar } from '../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Badge } from '../ui/badge';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger,
-  DialogFooter,
-  DialogDescription
-} from '../ui/dialog';
-import { FilterConfig } from '../WebBuilder';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '../ui/dialog';
 import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
-import { useData } from '../DataContext';  // ✅ import context
 
-interface FilterPanelProps {
+import { useData } from '../DataContext';
+import { FilterConfig } from '../WebBuilder';
+
+type FilterPanelProps = {
   filters: FilterConfig[];
   onAddFilter: (filter: Omit<FilterConfig, 'id'>) => void;
   onUpdateFilter: (filterId: string, updates: Partial<FilterConfig>) => void;
   onDeleteFilter: (filterId: string) => void;
-}
+};
 
 export function FilterPanel({ filters, onAddFilter, onUpdateFilter, onDeleteFilter }: FilterPanelProps) {
   const [isAddingFilter, setIsAddingFilter] = useState(false);
@@ -41,345 +34,208 @@ export function FilterPanel({ filters, onAddFilter, onUpdateFilter, onDeleteFilt
     value: null
   });
 
-  // ✅ Get active dataset columns dynamically
   const { dataSources, activeDatasetId } = useData();
   const activeDataset = dataSources.find(ds => ds.id === activeDatasetId);
-  const availableColumns = activeDataset?.columns || [];  // ✅ replaces hardcoded
+  const availableColumns = activeDataset?.columns || [];
 
+  // default values when creating filters
+  const getDefaultValue = (type: FilterConfig['type'], column: any) => {
+    switch (type) {
+      case 'select': return column?.values?.[0] || '';
+      case 'checkbox': return column?.values || [];
+      case 'radio': return column?.values?.[0] || '';
+      case 'slider': return column?.range || { min: 0, max: 100 };
+      case 'date': return { start: new Date(), end: new Date() };
+      default: return null;
+    }
+  };
+
+  // add filter
   const handleAddFilter = () => {
     if (newFilter.label && newFilter.column) {
       const column = availableColumns.find(col => col.name === newFilter.column);
       const filterConfig: Omit<FilterConfig, 'id'> = {
         ...newFilter,
-        options: column?.values,   // only if values exist in column
+        options: column?.values,
         range: column?.range,
         value: getDefaultValue(newFilter.type, column)
       };
-      
       onAddFilter(filterConfig);
       setNewFilter({ type: 'select', label: '', column: '', value: null });
       setIsAddingFilter(false);
     }
   };
 
-  const getDefaultValue = (type: FilterConfig['type'], column: any) => {
-    switch (type) {
+  // render control per filter type
+  const renderFilterControl = (filter: FilterConfig) => {
+    switch (filter.type) {
       case 'select':
-        return column?.values?.[0] || '';
+        return (
+          <Select value={filter.value ?? undefined} onValueChange={(value) => onUpdateFilter(filter.id, { value })}>
+            <SelectTrigger><SelectValue placeholder="Select value" /></SelectTrigger>
+            <SelectContent>
+              {filter.options?.map((opt: any) => (
+                <SelectItem key={String(opt)} value={String(opt)}>{String(opt)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
       case 'checkbox':
-        return column?.values || [];
+        return (
+          <div className="space-y-2">
+            {filter.options?.map((opt: any) => {
+              const checked = Array.isArray(filter.value) && filter.value.includes(opt);
+              return (
+                <div key={opt} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`${filter.id}-${opt}`}
+                    checked={checked}
+                    onCheckedChange={(c) => {
+                      const current: any[] = Array.isArray(filter.value) ? filter.value : [];
+                      const next = c ? [...current, opt] : current.filter(v => v !== opt);
+                      onUpdateFilter(filter.id, { value: next });
+                    }}
+                  />
+                  <Label htmlFor={`${filter.id}-${opt}`} className="text-sm">{opt}</Label>
+                </div>
+              );
+            })}
+          </div>
+        );
       case 'radio':
-        return column?.values?.[0] || '';
-      case 'slider':
-        return column?.range || { min: 0, max: 100 };
-      case 'date':
-        return { start: new Date(), end: new Date() };
+        return (
+          <RadioGroup value={filter.value ?? undefined} onValueChange={(val) => onUpdateFilter(filter.id, { value: val })}>
+            {filter.options?.map((opt: any) => (
+              <div key={opt} className="flex items-center space-x-2">
+                <RadioGroupItem value={String(opt)} id={`${filter.id}-${opt}`} />
+                <Label htmlFor={`${filter.id}-${opt}`} className="text-sm">{String(opt)}</Label>
+              </div>
+            ))}
+          </RadioGroup>
+        );
+      case 'slider': {
+        const range = filter.range || { min: 0, max: 100 };
+        const value = filter.value || range;
+        return (
+          <div className="space-y-4">
+            <Slider
+              value={[Number(value.min), Number(value.max)]}
+              onValueChange={([min, max]) => onUpdateFilter(filter.id, { value: { min, max } })}
+              min={Number(range.min)}
+              max={Number(range.max)}
+              step={Math.ceil((Number(range.max) - Number(range.min)) / 100) || 1}
+            />
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>{value.min}</span><span>{value.max}</span>
+            </div>
+          </div>
+        );
+      }
+      case 'date': {
+        const dateValue = filter.value || { start: new Date(), end: new Date() };
+        return (
+          <div className="grid grid-cols-2 gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="justify-start">
+                  {dateValue.start ? format(new Date(dateValue.start), "PPP") : "Start date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent><Calendar mode="single" selected={dateValue.start ? new Date(dateValue.start) : undefined}
+                onSelect={(date) => date && onUpdateFilter(filter.id, { value: { ...dateValue, start: date } })}
+              /></PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="justify-start">
+                  {dateValue.end ? format(new Date(dateValue.end), "PPP") : "End date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent><Calendar mode="single" selected={dateValue.end ? new Date(dateValue.end) : undefined}
+                onSelect={(date) => date && onUpdateFilter(filter.id, { value: { ...dateValue, end: date } })}
+              /></PopoverContent>
+            </Popover>
+          </div>
+        );
+      }
       default:
         return null;
     }
   };
 
-  const renderFilterControl = (filter: FilterConfig) => {
-    switch (filter.type) {
-      case 'select':
-        return (
-          <Select
-            value={filter.value}
-            onValueChange={(value) => onUpdateFilter(filter.id, { value })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select value" />
-            </SelectTrigger>
-            <SelectContent>
-              {filter.options?.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        );
-
-      case 'checkbox':
-        return (
-          <div className="space-y-2">
-            {filter.options?.map((option) => (
-              <div key={option} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`${filter.id}-${option}`}
-                  checked={Array.isArray(filter.value) && filter.value.includes(option)}
-                  onCheckedChange={(checked) => {
-                    const currentValue = Array.isArray(filter.value) ? filter.value : [];
-                    const newValue = checked
-                      ? [...currentValue, option]
-                      : currentValue.filter(v => v !== option);
-                    onUpdateFilter(filter.id, { value: newValue });
-                  }}
-                />
-                <Label htmlFor={`${filter.id}-${option}`} className="text-sm">
-                  {option}
-                </Label>
-              </div>
-            ))}
-          </div>
-        );
-
-      case 'radio':
-        return (
-          <RadioGroup
-            value={filter.value}
-            onValueChange={(value) => onUpdateFilter(filter.id, { value })}
-          >
-            {filter.options?.map((option) => (
-              <div key={option} className="flex items-center space-x-2">
-                <RadioGroupItem value={option} id={`${filter.id}-${option}`} />
-                <Label htmlFor={`${filter.id}-${option}`} className="text-sm">
-                  {option}
-                </Label>
-              </div>
-            ))}
-          </RadioGroup>
-        );
-
-      case 'slider':
-        const range = filter.range || { min: 0, max: 100 };
-        const value = filter.value || range;
-        return (
-          <div className="space-y-4">
-            <div className="px-3">
-              <Slider
-                value={[value.min, value.max]}
-                onValueChange={([min, max]) => 
-                  onUpdateFilter(filter.id, { value: { min, max } })
-                }
-                min={range.min}
-                max={range.max}
-                step={Math.ceil((range.max - range.min) / 100)}
-              />
-            </div>
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>{value.min}</span>
-              <span>{value.max}</span>
-            </div>
-          </div>
-        );
-
-      case 'date':
-        const dateValue = filter.value || { start: new Date(), end: new Date() };
-        return (
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateValue.start ? format(dateValue.start, "PPP") : "Start date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={dateValue.start}
-                    onSelect={(date) => 
-                      date && onUpdateFilter(filter.id, { 
-                        value: { ...dateValue, start: date } 
-                      })
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateValue.end ? format(dateValue.end, "PPP") : "End date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={dateValue.end}
-                    onSelect={(date) => 
-                      date && onUpdateFilter(filter.id, { 
-                        value: { ...dateValue, end: date } 
-                      })
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-        );
-
-      default:
-        return <div>Unsupported filter type</div>;
-    }
-  };
-
   return (
     <div className="h-full flex flex-col bg-card border-r border-border">
-      <div className="border-b border-border p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            <h3 className="font-medium">Filters</h3>
-          </div>
-          
-          <Dialog open={isAddingFilter} onOpenChange={setIsAddingFilter}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Filter</DialogTitle>
-                <DialogDescription>
-                  Create a new filter to enable interactive data exploration in your dashboard.
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="filter-label">Filter Label</Label>
-                  <Input
-                    id="filter-label"
-                    value={newFilter.label}
-                    onChange={(e) => setNewFilter({ ...newFilter, label: e.target.value })}
-                    placeholder="e.g., Region Filter"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="filter-column">Data Column</Label>
-                  <Select
-                    value={newFilter.column}
-                    onValueChange={(column) => setNewFilter({ ...newFilter, column })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select column to filter" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableColumns.map((column) => (
-                        <SelectItem key={column.name} value={column.name}>
-                          <div className="flex items-center justify-between w-full">
-                            <span>{column.name}</span>
-                            <Badge variant="secondary" className="ml-2 text-xs">
-                              {column.type}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="filter-type">Filter Type</Label>
-                  <Select
-                    value={newFilter.type}
-                    onValueChange={(type: FilterConfig['type']) => setNewFilter({ ...newFilter, type })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="select">Dropdown Select</SelectItem>
-                      <SelectItem value="checkbox">Checkbox List</SelectItem>
-                      <SelectItem value="radio">Radio Buttons</SelectItem>
-                      <SelectItem value="slider">Range Slider</SelectItem>
-                      <SelectItem value="date">Date Range</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddingFilter(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAddFilter} disabled={!newFilter.label || !newFilter.column}>
-                  Add Filter
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+      {/* Header */}
+      <div className="border-b border-border p-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <FilterIcon className="h-5 w-5" />
+          <h3 className="font-medium">Filters</h3>
         </div>
-        
-        <p className="text-sm text-muted-foreground">
-          Interactive filters for dashboard cross-filtering
-        </p>
+        <Dialog open={isAddingFilter} onOpenChange={setIsAddingFilter}>
+          <DialogTrigger asChild><Button size="sm" variant="outline"><Plus className="h-4 w-4" /></Button></DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add New Filter</DialogTitle><DialogDescription>Create a filter to explore your data.</DialogDescription></DialogHeader>
+            <div className="space-y-4">
+              <div><Label>Filter Label</Label><Input value={newFilter.label} onChange={(e) => setNewFilter({ ...newFilter, label: e.target.value })} /></div>
+              <div><Label>Column</Label>
+                <Select value={newFilter.column} onValueChange={(col) => setNewFilter({ ...newFilter, column: col })}>
+                  <SelectTrigger><SelectValue placeholder="Select column" /></SelectTrigger>
+                  <SelectContent>
+                    {availableColumns.map(c => <SelectItem key={c.name} value={c.name}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div><Label>Type</Label>
+                <Select value={newFilter.type} onValueChange={(type: FilterConfig['type']) => setNewFilter({ ...newFilter, type })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="select">Dropdown</SelectItem>
+                    <SelectItem value="checkbox">Checkbox</SelectItem>
+                    <SelectItem value="radio">Radio</SelectItem>
+                    <SelectItem value="slider">Slider</SelectItem>
+                    <SelectItem value="date">Date Range</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAddingFilter(false)}>Cancel</Button>
+              <Button onClick={handleAddFilter} disabled={!newFilter.label || !newFilter.column}>Add</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      <div className="flex-1 overflow-auto p-4">
+      {/* Filters list */}
+      <div className="flex-1 overflow-auto p-4 space-y-4">
         {filters.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-              <Filter className="h-8 w-8 text-muted-foreground" />
-            </div>
-            <h3 className="font-medium mb-2">No Filters</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Add filters to enable interactive data exploration
-            </p>
-            <Button variant="outline" size="sm" onClick={() => setIsAddingFilter(true)}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add First Filter
-            </Button>
-          </div>
+          <div className="text-center text-sm text-muted-foreground">No filters yet</div>
         ) : (
-          <div className="space-y-4">
-            {filters.map((filter) => (
-              <Card key={filter.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm">{filter.label}</CardTitle>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm">
-                        <Settings className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onDeleteFilter(filter.id)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    <Badge variant="outline" className="text-xs">
-                      {filter.column}
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs">
-                      {filter.type}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {renderFilterControl(filter)}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          filters.map(filter => (
+            <Card key={filter.id}>
+              <CardHeader className="pb-2 flex justify-between">
+                <CardTitle className="text-sm">{filter.label}</CardTitle>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => onDeleteFilter(filter.id)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>{renderFilterControl(filter)}</CardContent>
+            </Card>
+          ))
         )}
       </div>
 
+      {/* Reset button */}
       {filters.length > 0 && (
         <div className="border-t border-border p-4">
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            onClick={() => {
-              filters.forEach(filter => {
-                const col = availableColumns.find(c => c.name === filter.column);
-                onUpdateFilter(filter.id, { value: getDefaultValue(filter.type, col) });
-              });
-            }}
-          >
+          <Button variant="outline" size="sm" className="w-full" onClick={() => {
+            filters.forEach(f => {
+              const col = availableColumns.find(c => c.name === f.column);
+              onUpdateFilter(f.id, { value: getDefaultValue(f.type, col) });
+            });
+          }}>
             Reset All Filters
           </Button>
         </div>

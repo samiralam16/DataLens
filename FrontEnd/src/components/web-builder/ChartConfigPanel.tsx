@@ -6,43 +6,58 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Slider } from '../ui/slider';
-import { ChartConfig } from '../WebBuilder';
+import { ChartConfig } from '../../services/api';
 
 interface ChartConfigPanelProps {
   chart: ChartConfig;
-  // mode = "preview" for live update, "apply" for commit, "cancel" to discard
   onUpdateChart: (mode: "preview" | "apply" | "cancel", updates: Partial<ChartConfig>) => void;
   onClose?: () => void;
 }
 
+const normalizeChart = (chart: Partial<ChartConfig>): ChartConfig => ({
+  id: chart.id || `chart-${Date.now()}`,
+  type: chart.type || "bar",
+  title: chart.title || "Untitled Chart",
+  data: chart.data || [],
+  x: chart.x || "",
+  y: chart.y || "",
+  position: chart.position || { x: 0, y: 0 },
+  size: chart.size || { width: 400, height: 300 },
+  filters: chart.filters || {},
+  legendLabel: chart.legendLabel || ""   // ✅ new field
+});
+
 export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigPanelProps) {
-  const [localChart, setLocalChart] = useState(chart);
+  const [localChart, setLocalChart] = useState<ChartConfig>(normalizeChart(chart));
 
   const handlePreview = (updates: Partial<ChartConfig>) => {
-    const newChart = { ...localChart, ...updates };
+    const newChart = normalizeChart({ ...localChart, ...updates });
     setLocalChart(newChart);
     onUpdateChart("preview", updates);
   };
 
   const handleApply = () => {
-    onUpdateChart("apply", localChart);
+    const normalized = normalizeChart(localChart);
+    onUpdateChart("apply", normalized);
     if (onClose) onClose();
   };
 
   const handleReset = () => {
-    setLocalChart(chart);
-    onUpdateChart("preview", chart);
+    const reset = normalizeChart(chart);
+    setLocalChart(reset);
+    onUpdateChart("preview", reset);
   };
 
   const handleCancel = () => {
-    setLocalChart(chart);
-    onUpdateChart("cancel", {}); 
+    const reset = normalizeChart(chart);
+    setLocalChart(reset);
+    onUpdateChart("cancel", {});
     if (onClose) onClose();
   };
 
-  const availableColumns = chart.data.length > 0 ? Object.keys(chart.data[0]) : [];
+  const availableColumns = localChart.data.length > 0 ? Object.keys(localChart.data[0]) : [];
   const numericColumns = availableColumns.filter(col =>
-    chart.data.some(row => typeof row[col] === 'number' && !isNaN(row[col]))
+    localChart.data.some(row => typeof row[col] === 'number' && !isNaN(row[col]))
   );
 
   const chartTypeOptions = [
@@ -57,7 +72,6 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
 
   return (
     <div className="flex flex-col h-full">
-      {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto space-y-6 p-4">
         {/* Basic Settings */}
         <Card>
@@ -95,6 +109,17 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* ✅ Legend Label input */}
+            <div className="space-y-2">
+              <Label htmlFor="legend-label">Legend Label</Label>
+              <Input
+                id="legend-label"
+                value={localChart.legendLabel || ""}
+                onChange={(e) => handlePreview({ legendLabel: e.target.value })}
+                placeholder="Enter legend label (optional)"
+              />
             </div>
           </CardContent>
         </Card>
@@ -169,6 +194,7 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
             <CardTitle className="text-lg">Size & Position</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Width/Height sliders */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Width: {localChart.size.width}px</Label>
@@ -196,6 +222,7 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
               </div>
             </div>
 
+            {/* Position inputs */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="pos-x">X Position</Label>
@@ -228,7 +255,7 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
         </Card>
       </div>
 
-      {/* Sticky footer (always visible) */}
+      {/* Sticky footer */}
       <div className="flex gap-2 p-4 border-t bg-background shrink-0">
         <Button onClick={handleApply} className="flex-1">
           Apply Changes
