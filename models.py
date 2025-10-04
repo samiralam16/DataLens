@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Float, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Float, JSON,func
 from sqlalchemy.orm import relationship
 from extensions import Base
 
@@ -119,3 +119,13 @@ class Snapshot(Base):
             "created_at": self.created_at
         }
 
+
+class Dashboard(Base):
+    __tablename__ = "dashboards"
+
+    id = Column(Integer, primary_key=True, index=True)
+    dataset_id = Column(String, index=True)
+    name = Column(String, nullable=True)
+    config = Column(JSON, nullable=False)   # store ChartConfig[] here
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

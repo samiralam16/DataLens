@@ -36,7 +36,7 @@ export interface ListDatasetsResponse {
 }
 
 // ----------------------
-// Saved Query (legacy type, not used for snapshots anymore)
+// Saved Query (legacy)
 // ----------------------
 export interface SavedQuery {
   id: number;
@@ -51,7 +51,7 @@ export interface SavedQuery {
 }
 
 // ----------------------
-// Dataset APIs (/api/data/...)
+// Dataset APIs
 // ----------------------
 export const uploadFiles = async (files: File[]): Promise<UploadResponse> => {
   const formData = new FormData();
@@ -101,7 +101,7 @@ export const getDatasetPreview = async (
 };
 
 // ----------------------
-// Query Execution API (/query?...)
+// Query Execution API
 // ----------------------
 export const executeQuery = async (sql: string): Promise<QueryResult> => {
   const response = await fetch(
@@ -133,7 +133,7 @@ export const parseColumnsInfo = (columnsInfo: string): string[] => {
 };
 
 // ----------------------
-// Snapshot Types
+// Snapshot Types & APIs
 // ----------------------
 export interface Snapshot {
   id: number;
@@ -143,9 +143,6 @@ export interface Snapshot {
   created_at: string;
 }
 
-// ----------------------
-// Snapshot APIs (/query/snapshots/...)
-// ----------------------
 export const listSnapshots = async (): Promise<Snapshot[]> => {
   const res = await fetch(`${API_BASE_URL}/query/snapshots`);
   if (!res.ok) throw new Error("Failed to fetch snapshots");
@@ -172,9 +169,6 @@ export const deleteSnapshot = async (id: number): Promise<void> => {
   if (!res.ok) throw new Error("Failed to delete snapshot");
 };
 
-// ----------------------
-// Snapshot Preview API (normalized same as dataset preview)
-// ----------------------
 export const getSnapshotPreview = async (
   snapshotId: number,
   limit: number = 50
@@ -187,7 +181,7 @@ export const getSnapshotPreview = async (
 };
 
 // ----------------------
-// 🔥 Unified Sources API (datasets + snapshots)
+// 🔥 Unified Sources API
 // ----------------------
 export interface DataSource {
   id: number;
@@ -195,12 +189,105 @@ export interface DataSource {
   type: "dataset" | "snapshot";
   rows: number;
   file_type: string;
-  filename?: string; // dataset only
-  result_table?: string; // snapshot only
+  filename?: string;
+  result_table?: string;
 }
 
 export const listAllSources = async (): Promise<{ sources: DataSource[] }> => {
   const res = await fetch(`${API_BASE_URL}/query/all-sources`);
   if (!res.ok) throw new Error("Failed to fetch sources");
+  return res.json();
+};
+
+/// ----------------------
+// Dashboard Types
+// ----------------------
+export interface ChartConfig {
+  id: string;
+  type: "bar" | "line" | "pie" | "scatter" | "heatmap" | "treemap" | "geo";
+  title: string;
+  data: any[];
+  x: string | null;
+  y: string | null;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  filters: Record<string, any>;
+}
+
+export interface Dashboard {
+  id: number;
+  dataset_id: number;
+  name: string;
+  config: ChartConfig[];
+  created_at: string;
+}
+
+// ----------------------
+// Dashboard APIs
+// ----------------------
+
+// ✅ Save (always normalize charts before sending)
+export const saveDashboard = async (
+  datasetId: number | string | null | undefined,
+  name: string,
+  charts: ChartConfig[]
+): Promise<Dashboard> => {
+  if (!datasetId || isNaN(Number(datasetId))) {
+    throw new Error(`Invalid datasetId: ${datasetId}`);
+  }
+
+  const normalizedCharts = charts.map((c) => ({
+    id: c.id,
+    type: c.type,
+    title: c.title || "",
+    data: c.data || [],
+    x: c.x || "", // must be string, backend expects str
+    y: c.y || "", // must be string, backend expects str
+    position: c.position || { x: 0, y: 0 },
+    size: c.size || { width: 400, height: 300 },
+    filters: c.filters || {},
+  }));
+
+  const payload = {
+    dataset_id: Number(datasetId),  // ✅ guaranteed integer
+    name,
+    config: normalizedCharts,
+  };
+
+  console.log("📤 Saving dashboard payload:", payload);
+
+  const res = await fetch(`${API_BASE_URL}/api/dashboards`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    console.error("❌ Save dashboard failed:", err);
+    throw new Error(`Failed to save dashboard: ${res.statusText}`);
+  }
+
+  return res.json();
+};
+
+
+
+// List all dashboards (optionally by dataset)
+export const listDashboards = async (
+  datasetId?: number
+): Promise<Dashboard[]> => {
+  const url = datasetId
+    ? `${API_BASE_URL}/api/dashboards/list?dataset_id=${datasetId}`
+    : `${API_BASE_URL}/api/dashboards/list`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Failed to fetch dashboards");
+  return res.json();
+};
+
+// Load a specific dashboard by ID
+export const loadDashboard = async (id: number): Promise<Dashboard> => {
+  const res = await fetch(`${API_BASE_URL}/api/dashboards/${id}`);
+  if (!res.ok) throw new Error("Failed to fetch dashboard");
   return res.json();
 };
