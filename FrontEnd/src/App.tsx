@@ -36,43 +36,43 @@ export default function App() {
             setSidebarOpen={setSidebarOpen}
           />
 
-          <div className="flex flex-1 overflow-hidden">
-            {/* ✅ Global Sidebar (controls both modules) */}
-            <Sidebar
-              isOpen={sidebarOpen}
-              activeModule={activeModule}
-              onModuleChange={setActiveModule}
+          <div className=" flex flex-1 min-h-0 overflow-hidden">
+      {/* ✅ Global Sidebar (controls both modules) */}
+        <Sidebar
+          isOpen={sidebarOpen}
+          activeModule={activeModule}
+          onModuleChange={setActiveModule}
+          activeTool={activeTool}
+          setActiveTool={setActiveTool}
+          onAIAssistantClick={handleAIAssistantToggle}
+          onAddChart={() => addChartRef.current?.()}
+          onChangeTab={(tab) => {
+            if (activeModule === "web") {
+              setActiveTab(tab);   // ✅ for WebBuilder
+            } else {
+              setActiveTool(tab);  // ✅ for SQLBuilder
+            }
+          }}
+        />
+
+        {/* Main content */}
+        <main className="flex-1 min-h-0 flex flex-col">
+          {activeModule === "sql" ? (
+            <SQLBuilder
               activeTool={activeTool}
               setActiveTool={setActiveTool}
-              onAIAssistantClick={handleAIAssistantToggle}
-              onAddChart={() => addChartRef.current?.()}
-              onChangeTab={(tab) => {
-                if (activeModule === "web") {
-                  setActiveTab(tab);   // ✅ for WebBuilder
-                } else {
-                  setActiveTool(tab);  // ✅ for SQLBuilder
-                }
-              }}
+              showAIAssistant={showAIAssistant}
+              setShowAIAssistant={setShowAIAssistant}
             />
-
-            {/* Main content */}
-            <main className="flex-1 overflow-hidden">
-              {activeModule === "sql" ? (
-                <SQLBuilder
-                  activeTool={activeTool}
-                  setActiveTool={setActiveTool}
-                  showAIAssistant={showAIAssistant}
-                  setShowAIAssistant={setShowAIAssistant}
-                />
-              ) : (
-                <WebBuilder
-                  addChartRef={addChartRef}
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                />
-              )}
-            </main>
-          </div>
+          ) : (
+            <WebBuilder
+              addChartRef={addChartRef}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+            />
+          )}
+        </main>
+      </div>
 
           <Toaster />
         </div>

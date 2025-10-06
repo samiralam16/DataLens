@@ -121,7 +121,7 @@ async def delete_snapshot(snapshot_id: int, db: Session = Depends(get_db)):
     try:
         # Drop table
         with engine.connect() as conn:
-            conn.execute(text(f"DROP TABLE IF EXISTS {snapshot.result_table}"))
+            conn.execute(text(f"DROP TABLE IF EXISTS '{snapshot.result_table}'"))
 
         db.delete(snapshot)
         db.commit()

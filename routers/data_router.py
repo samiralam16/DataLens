@@ -91,8 +91,9 @@ async def get_dataset(dataset_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load dataset preview: {str(e)}")
 
+    data_preview = await get_data_preview(dataset.file_path, dataset.file_type)
     result = dataset.to_dict()
-    result['data_preview'] = data_preview
+    result.update(data_preview)  # merges columns, rows, total_rows
     return result
 
 

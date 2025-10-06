@@ -32,7 +32,7 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
     setAnalyzedData,
     activeDatasetId,
     setActiveDataset,
-    setActiveModule
+    setActiveModule,
   } = useData();
 
   const [activeQuery, setActiveQuery] = useState("");
@@ -84,14 +84,12 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
         originalName: col,
       }));
 
-      // ✅ New dataset name for query result
       const datasetId = `query_result_${Date.now()}`;
 
-// Try to detect the table name from the query (optional)
-const match = query.match(/from\s+([a-zA-Z0-9_]+)/i);
-const tableRef = match ? match[1] : null;
+      const match = query.match(/from\s+([a-zA-Z0-9_]+)/i);
+      const tableRef = match ? match[1] : null;
 
-const friendlyName = tableRef
+      const friendlyName = tableRef
         ? `Query on ${tableRef} (${result.rows_returned} rows)`
         : `Unsaved Query Result (${result.rows_returned} rows)`;
 
@@ -114,7 +112,7 @@ const friendlyName = tableRef
     }
   };
 
-  // ✅ Handle CSV Import (shared logic)
+  // ✅ Handle CSV Import
   const handleImport = (fileName: string, rows: any[], cols: any[]) => {
     const dsId = fileName.replace(/\s+/g, "_").toLowerCase();
     setActiveDataset(dsId);
@@ -130,10 +128,10 @@ const friendlyName = tableRef
     toast.success(`CSV "${fileName}" imported (${rows.length} rows).`);
   };
 
-  // ✅ Editor view
+  // ✅ Editor View
   const renderEditor = () => (
     <>
-      <div className="border-b border-border p-2 flex gap-2">
+      {/* <div className="border-b border-border p-2 flex gap-2">
         {[
           { key: "editor", label: "SQL Editor" },
           { key: "import", label: "Data Import" },
@@ -152,11 +150,12 @@ const friendlyName = tableRef
             {label}
           </button>
         ))}
-      </div>
+      </div> */}
 
-      <div className="flex-1">
+      {/* ✅ Properly constrained scrollable layout */}
+      <div className="flex-1 min-h-0 min-w-0 flex flex-col">
         {activeTab === "editor" && (
-          <ResizablePanelGroup direction="vertical">
+          <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
             <ResizablePanel defaultSize={60} minSize={30}>
               <SQLEditor
                 onExecuteQuery={handleExecuteQuery}
@@ -164,19 +163,28 @@ const friendlyName = tableRef
                 defaultQuery={activeQuery}
               />
             </ResizablePanel>
+
             <ResizableHandle />
-            <ResizablePanel defaultSize={40} minSize={20}>
-              <ResultsDisplay
-                results={queryResults}
-                query={activeQuery}
-                isLoading={isExecuting}
-              />
+
+            <ResizablePanel
+              defaultSize={40}
+              minSize={20}
+              className="overflow-hidden"
+            >
+              <div className="h-full w-full flex flex-col min-h-0 min-w-0">
+                <div className="flex-1 overflow-x-auto overflow-y-auto">
+                  <ResultsDisplay
+                    results={queryResults}
+                    query={activeQuery}
+                    isLoading={isExecuting}
+                  />
+                </div>
+              </div>
             </ResizablePanel>
           </ResizablePanelGroup>
         )}
 
         {activeTab === "import" && <DataImport onImport={handleImport} />}
-
         {activeTab === "saved" && (
           <SavedQueries
             goToEditor={() => {
@@ -185,15 +193,14 @@ const friendlyName = tableRef
             }}
           />
         )}
-
         {activeTab === "sources" && <ConnectedSources />}
       </div>
     </>
   );
 
   return (
-    <div className="h-full flex">
-      <div className="flex-1 flex flex-col">
+    <div className="h-full flex min-h-0 min-w-0">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {activeTool === "editor" && renderEditor()}
         {activeTool === "import" && <DataImport onImport={handleImport} />}
         {activeTool === "queries" && (

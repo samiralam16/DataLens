@@ -179,113 +179,114 @@ export function DashboardBuilder({
   }
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      <div className="border-b border-border p-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold">Dashboard Builder</h2>
-          <p className="text-sm text-muted-foreground">
-            {isGridMode ? `Grid layout (${gridCols} columns)` : 'Free-form drag and drop view'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary">
-            {charts.length} chart{charts.length !== 1 ? 's' : ''}
-          </Badge>
-          {isGridMode && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Grid3X3 className="h-4 w-4 mr-1" />
-                  {gridCols} Cols
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {[1, 2, 3, 4].map((cols) => (
-                  <DropdownMenuItem
-                    key={cols}
-                    onClick={() => setGridCols(cols)}
-                    className={gridCols === cols ? 'bg-accent' : ''}
-                  >
-                    {cols} Column{cols !== 1 ? 's' : ''}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+  <div className="h-full min-h-0 flex flex-col bg-background">
+    <div className="border-b border-border p-4 flex items-center justify-between">
+      <div>
+        <h2 className="text-lg font-semibold">Dashboard Builder</h2>
+        <p className="text-sm text-muted-foreground">
+          {isGridMode ? `Grid layout (${gridCols} columns)` : 'Free-form drag and drop view'}
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <Badge variant="secondary">
+          {charts.length} chart{charts.length !== 1 ? 's' : ''}
+        </Badge>
+        {isGridMode && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-1" />
-                Add Chart
+                <Grid3X3 className="h-4 w-4 mr-1" />
+                {gridCols} Cols
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              {chartTypes.map((chartType) => (
+              {[1, 2, 3, 4].map((cols) => (
                 <DropdownMenuItem
-                  key={chartType.type}
-                  onClick={() => onAddChart(chartType.type)}
+                  key={cols}
+                  onClick={() => setGridCols(cols)}
+                  className={gridCols === cols ? 'bg-accent' : ''}
                 >
-                  <span className="mr-2">{chartType.icon}</span>
-                  {chartType.label}
+                  {cols} Column{cols !== 1 ? 's' : ''}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsGridMode(!isGridMode)}
-          >
-            {isGridMode ? <Move className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            {isGridMode ? 'Free Form' : 'Grid View'}
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-auto relative">
-        {isGridMode ? (
-          <div className={`grid ${getGridColsClass()} gap-6 p-6`}>
-            {charts.map((chart) => {
-              const filteredData = applyFiltersToData(chart.data, chart.filters);
-              const preview = tempEdits[chart.id] || {};
-              const previewChart = { ...chart, ...preview, data: filteredData };
-              return (
-                <ResizableChart
-                  key={chart.id}
-                  chart={previewChart}
-                  isSelected={selectedChart === chart.id}
-                  onSelect={() => onSelectChart(chart.id)}
-                  onUpdate={(updates, mode) => handleChartUpdate(chart.id, updates, mode)}
-                  onDelete={() => onDeleteChart(chart.id)}
-                  isGridMode={true}
-                />
-              );
-            })}
-          </div>
-        ) : (
-          <div 
-            className="relative w-full h-full min-h-[800px] bg-grid-pattern p-4"
-            onClick={() => onSelectChart(null)}
-          >
-            {charts.map((chart) => {
-              const filteredData = applyFiltersToData(chart.data, chart.filters);
-              const preview = tempEdits[chart.id] || {};
-              const previewChart = { ...chart, ...preview, data: filteredData };
-              return (
-                <ResizableChart
-                  key={chart.id}
-                  chart={previewChart}
-                  isSelected={selectedChart === chart.id}
-                  onSelect={() => onSelectChart(chart.id)}
-                  onUpdate={(updates, mode) => handleChartUpdate(chart.id, updates, mode)}
-                  onDelete={() => onDeleteChart(chart.id)}
-                  isGridMode={false}
-                />
-              );
-            })}
-          </div>
         )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <Plus className="h-4 w-4 mr-1" />
+              Add Chart
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            {chartTypes.map((chartType) => (
+              <DropdownMenuItem
+                key={chartType.type}
+                onClick={() => onAddChart(chartType.type)}
+              >
+                <span className="mr-2">{chartType.icon}</span>
+                {chartType.label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsGridMode(!isGridMode)}
+        >
+          {isGridMode ? <Move className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          {isGridMode ? 'Free Form' : 'Grid View'}
+        </Button>
       </div>
     </div>
-  );
+
+    <div className="flex-1 min-h-0 overflow-y-auto scroll-smooth relative">
+      {isGridMode ? (
+        <div className={`grid ${getGridColsClass()} gap-6 p-6`}>
+          {charts.map((chart) => {
+            const filteredData = applyFiltersToData(chart.data, chart.filters);
+            const preview = tempEdits[chart.id] || {};
+            const previewChart = { ...chart, ...preview, data: filteredData };
+            return (
+              <ResizableChart
+                key={chart.id}
+                chart={previewChart}
+                isSelected={selectedChart === chart.id}
+                onSelect={() => onSelectChart(chart.id)}
+                onUpdate={(updates, mode) => handleChartUpdate(chart.id, updates, mode)}
+                onDelete={() => onDeleteChart(chart.id)}
+                isGridMode={true}
+              />
+            );
+          })}
+        </div>
+      ) : (
+        <div
+          className="relative w-full h-full min-h-[800px] bg-grid-pattern p-4"
+          onClick={() => onSelectChart(null)}
+        >
+          {charts.map((chart) => {
+            const filteredData = applyFiltersToData(chart.data, chart.filters);
+            const preview = tempEdits[chart.id] || {};
+            const previewChart = { ...chart, ...preview, data: filteredData };
+            return (
+              <ResizableChart
+                key={chart.id}
+                chart={previewChart}
+                isSelected={selectedChart === chart.id}
+                onSelect={() => onSelectChart(chart.id)}
+                onUpdate={(updates, mode) => handleChartUpdate(chart.id, updates, mode)}
+                onDelete={() => onDeleteChart(chart.id)}
+                isGridMode={false}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
 }

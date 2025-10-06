@@ -243,19 +243,21 @@ export function ResizableChart({
 
   return (
     <Card
-      ref={chartRef}
-      className={`absolute cursor-move transition-all hover:shadow-lg ${
-        isSelected ? 'ring-2 ring-primary' : ''
-      } ${isDragging ? 'z-50' : ''}`}
-      style={{
-        left: chart.position.x,
-        top: chart.position.y,
-        width: chart.size.width,
-        height: chart.size.height
-      }}
-      onMouseDown={handleMouseDown}
-      onClick={onSelect}
-    >
+        ref={chartRef}
+        className={`absolute cursor-move transition-all hover:shadow-lg ${
+          isSelected ? 'ring-2 ring-primary' : ''
+        } ${isDragging ? 'z-50' : ''}`}
+        style={{
+          left: chart.position.x,
+          top: chart.position.y,
+          width: chart.size.width,
+          height: chart.size.height
+        }}
+        onMouseDown={(e) => {
+          handleMouseDown(e);  // existing drag logic
+          onSelect();          // ✅ ensure chart gets selected on mouse down
+        }}
+>
       <CardHeader className="pb-2 cursor-move">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">

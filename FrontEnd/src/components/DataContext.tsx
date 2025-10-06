@@ -38,6 +38,7 @@ interface DataContextType {
   loading: boolean;
   activeDatasetId: string | null;
   activeModule: 'sql' | 'web';
+  setDataSources: (sources: DataSource[]) => void;
   setActiveDataset: (id: string | null) => void;
   setActiveModule: (m: 'sql' | 'web') => void;
   refreshDatasets: () => Promise<void>;
@@ -184,19 +185,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setDataSources((prev) => [...prev, newSource]);
   };
 
-  const getDashboard = (datasetId: string) => dashboards[datasetId] || [];
-  const saveDashboard = (datasetId: string, charts: ChartConfig[]) =>
-    setDashboards((prev) => ({ ...prev, [datasetId]: charts }));
-  const clearDashboard = (datasetId: string) =>
-    setDashboards((prev) => {
-      const { [datasetId]: _, ...rest } = prev;
-      return rest;
-    });
+  const getDashboard = (datasetId: string | number) =>
+  dashboards[String(datasetId)] || [];
+
+const saveDashboard = (datasetId: string | number, charts: ChartConfig[]) =>
+  setDashboards((prev) => ({ ...prev, [String(datasetId)]: charts }));
+
+const clearDashboard = (datasetId: string | number) =>
+  setDashboards((prev) => {
+    const { [String(datasetId)]: _, ...rest } = prev;
+    return rest;
+  });
 
   return (
     <DataContext.Provider
       value={{
         dataSources,
+        setDataSources,
         analyzedData,
         datasets,
         snapshots,
