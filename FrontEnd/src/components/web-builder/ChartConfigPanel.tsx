@@ -24,16 +24,14 @@ const normalizeChart = (chart: Partial<ChartConfig>): ChartConfig => ({
   position: chart.position || { x: 0, y: 0 },
   size: chart.size || { width: 400, height: 300 },
   filters: chart.filters || {},
-  legendLabel: chart.legendLabel || ""   // ✅ new field
+  legendLabel: chart.legendLabel || ""
 });
 
 export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigPanelProps) {
   const [localChart, setLocalChart] = useState<ChartConfig>(normalizeChart(chart));
 
   const handlePreview = (updates: Partial<ChartConfig>) => {
-    const newChart = normalizeChart({ ...localChart, ...updates });
-    setLocalChart(newChart);
-    onUpdateChart("preview", updates);
+    setLocalChart(prev => normalizeChart({ ...prev, ...updates }));
   };
 
   const handleApply = () => {
@@ -73,6 +71,7 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto space-y-6 p-4">
+
         {/* Basic Settings */}
         <Card>
           <CardHeader>
@@ -85,6 +84,7 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
                 id="chart-title"
                 value={localChart.title}
                 onChange={(e) => handlePreview({ title: e.target.value })}
+                onBlur={(e) => onUpdateChart("apply", { title: e.target.value })}
                 placeholder="Enter chart title"
               />
             </div>
@@ -94,6 +94,7 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
               <Select
                 value={localChart.type}
                 onValueChange={(value: ChartConfig['type']) => handlePreview({ type: value })}
+                onBlur={() => onUpdateChart("apply", { type: localChart.type })}
               >
                 <SelectTrigger id="chart-type">
                   <SelectValue />
@@ -111,13 +112,13 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
               </Select>
             </div>
 
-            {/* ✅ Legend Label input */}
             <div className="space-y-2">
               <Label htmlFor="legend-label">Legend Label</Label>
               <Input
                 id="legend-label"
                 value={localChart.legendLabel || ""}
                 onChange={(e) => handlePreview({ legendLabel: e.target.value })}
+                onBlur={(e) => onUpdateChart("apply", { legendLabel: e.target.value })}
                 placeholder="Enter legend label (optional)"
               />
             </div>
@@ -132,7 +133,11 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="x-axis">X-Axis {localChart.type === 'pie' ? '(Categories)' : ''}</Label>
-              <Select value={localChart.x} onValueChange={(value) => handlePreview({ x: value })}>
+              <Select
+                value={localChart.x}
+                onValueChange={(value) => handlePreview({ x: value })}
+                onBlur={() => onUpdateChart("apply", { x: localChart.x })}
+              >
                 <SelectTrigger id="x-axis">
                   <SelectValue placeholder="Select column" />
                 </SelectTrigger>
@@ -156,7 +161,11 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
 
             <div className="space-y-2">
               <Label htmlFor="y-axis">Y-Axis {localChart.type === 'pie' ? '(Values)' : ''}</Label>
-              <Select value={localChart.y} onValueChange={(value) => handlePreview({ y: value })}>
+              <Select
+                value={localChart.y}
+                onValueChange={(value) => handlePreview({ y: value })}
+                onBlur={() => onUpdateChart("apply", { y: localChart.y })}
+              >
                 <SelectTrigger id="y-axis">
                   <SelectValue placeholder="Select column" />
                 </SelectTrigger>
@@ -177,14 +186,6 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
                 </SelectContent>
               </Select>
             </div>
-
-            {localChart.type === 'scatter' && (
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">
-                  💡 For scatter plots, both X and Y axes should be numeric columns for best results.
-                </p>
-              </div>
-            )}
           </CardContent>
         </Card>
 
@@ -194,15 +195,12 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
             <CardTitle className="text-lg">Size & Position</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Width/Height sliders */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Width: {localChart.size.width}px</Label>
                 <Slider
                   value={[localChart.size.width]}
-                  onValueChange={([width]) =>
-                    handlePreview({ size: { ...localChart.size, width } })
-                  }
+                  onValueChange={([width]) => handlePreview({ size: { ...localChart.size, width } })}
                   min={200}
                   max={800}
                   step={50}
@@ -212,9 +210,8 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
                 <Label>Height: {localChart.size.height}px</Label>
                 <Slider
                   value={[localChart.size.height]}
-                  onValueChange={([height]) =>
-                    handlePreview({ size: { ...localChart.size, height } })
-                  }
+                  onValueChange={([height]) => handlePreview({ size: { ...localChart.size, height } })}
+                  onValueCommit={([height]) => onUpdateChart("apply", { size: { ...localChart.size, height } })}
                   min={200}
                   max={600}
                   step={50}
@@ -222,7 +219,6 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
               </div>
             </div>
 
-            {/* Position inputs */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="pos-x">X Position</Label>
@@ -230,11 +226,8 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
                   id="pos-x"
                   type="number"
                   value={localChart.position.x}
-                  onChange={(e) =>
-                    handlePreview({
-                      position: { ...localChart.position, x: parseInt(e.target.value) || 0 }
-                    })
-                  }
+                  onChange={(e) => handlePreview({ position: { ...localChart.position, x: parseInt(e.target.value) || 0 } })}
+                  onBlur={(e) => onUpdateChart("apply", { position: { ...localChart.position, x: parseInt(e.target.value) || 0 } })}
                 />
               </div>
               <div className="space-y-2">
@@ -243,11 +236,8 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
                   id="pos-y"
                   type="number"
                   value={localChart.position.y}
-                  onChange={(e) =>
-                    handlePreview({
-                      position: { ...localChart.position, y: parseInt(e.target.value) || 0 }
-                    })
-                  }
+                  onChange={(e) => handlePreview({ position: { ...localChart.position, y: parseInt(e.target.value) || 0 } })}
+                  onBlur={(e) => onUpdateChart("apply", { position: { ...localChart.position, y: parseInt(e.target.value) || 0 } })}
                 />
               </div>
             </div>
@@ -255,17 +245,11 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
         </Card>
       </div>
 
-      {/* Sticky footer */}
+      {/* Footer */}
       <div className="flex gap-2 p-4 border-t bg-background shrink-0">
-        <Button onClick={handleApply} className="flex-1">
-          Apply Changes
-        </Button>
-        <Button variant="outline" onClick={handleReset}>
-          Reset
-        </Button>
-        <Button variant="ghost" onClick={handleCancel}>
-          Cancel
-        </Button>
+        <Button onClick={handleApply} className="flex-1">Apply Changes</Button>
+        <Button variant="outline" onClick={handleReset}>Reset</Button>
+        <Button variant="ghost" onClick={handleCancel}>Cancel</Button>
       </div>
     </div>
   );

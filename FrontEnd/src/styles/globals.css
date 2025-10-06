@@ -1,5 +1,6 @@
 @custom-variant dark (&:is(.dark *));
 
+/* ---------- Root Variables ---------- */
 :root {
   --font-size: 16px;
   --background: #ffffff;
@@ -41,6 +42,7 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* ---------- Dark Mode Variables ---------- */
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -61,8 +63,6 @@
   --border: oklch(0.269 0 0);
   --input: oklch(0.269 0 0);
   --ring: oklch(0.439 0 0);
-  --font-weight-medium: 500;
-  --font-weight-normal: 400;
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -78,6 +78,7 @@
   --sidebar-ring: oklch(0.439 0 0);
 }
 
+/* ---------- Tailwind Theme Mapping ---------- */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -119,9 +120,16 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* ---------- Base Layout ---------- */
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
+  *,
+  *::before,
+  *::after {
+    @apply border-border;
+  }
+
+  html {
+    font-size: var(--font-size);
   }
 
   body {
@@ -129,76 +137,79 @@
   }
 }
 
-/**
- * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
- */
-@layer base {
-  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
-    h1 {
-      font-size: var(--text-2xl);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
+/* ---------- Scroll & Flex Fixes ---------- */
 
-    h2 {
-      font-size: var(--text-xl);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
-
-    h3 {
-      font-size: var(--text-lg);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
-
-    h4 {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
-
-    p {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-normal);
-      line-height: 1.5;
-    }
-
-    label {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
-
-    button {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-medium);
-      line-height: 1.5;
-    }
-
-    input {
-      font-size: var(--text-base);
-      font-weight: var(--font-weight-normal);
-      line-height: 1.5;
-    }
-  }
+/* ✅ Allow flex children to scroll properly */
+.flex,
+.h-full {
+  min-width: 0;
+  min-height: 0;
+  overflow: visible !important;
 }
 
-html {
-  font-size: var(--font-size);
+/* Keep overflow hidden only in controlled Radix areas */
+[role="tabpanel"],
+[role="region"],
+[data-radix-scroll-area-viewport] {
+  overflow: hidden;
 }
 
-/* Grid pattern for dashboard free-form mode */
+/* ✅ General scroll helpers */
+.scroll-container {
+  overflow: auto !important;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ✅ Final unified scroll fix for query/data tables */
+.results-scroll {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  scrollbar-gutter: stable both-edges;
+  display: block;
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
+  max-height: 500px;
+}
+
+.results-scroll table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+/* Prevent parent overflow from clipping scroll */
+.results-scroll,
+.results-scroll * {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+/* Sticky header for all preview/data tables */
+.results-scroll thead th {
+  position: sticky;
+  top: 0;
+  background-color: var(--muted);
+  z-index: 10;
+}
+
+/* ---------- Data Import Scroll ---------- */
+.data-import-scroll {
+  overflow-y: auto !important;
+}
+
+/* ---------- Grid Background (Optional) ---------- */
 .bg-grid-pattern {
-  background-image: 
+  background-image:
     linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
-/* Dark mode grid pattern */
 .dark .bg-grid-pattern {
-  background-image: 
+  background-image:
     linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
 }

@@ -1,5 +1,5 @@
 const API_BASE_URL = "http://localhost:8000";
-
+import { DataSource as ContextDataSource } from "../components/DataContext";
 // ----------------------
 // Dataset Types
 // ----------------------
@@ -193,12 +193,28 @@ export interface DataSource {
   result_table?: string;
 }
 
-export const listAllSources = async (): Promise<{ sources: DataSource[] }> => {
+export const listAllSources = async (): Promise<{ sources: ContextDataSource[] }> => {
   const res = await fetch(`${API_BASE_URL}/query/all-sources`);
   if (!res.ok) throw new Error("Failed to fetch sources");
-  return res.json();
-};
 
+  const raw = await res.json();
+
+  // Transform API shape -> DataContext shape
+  const sources: ContextDataSource[] = raw.sources.map((src: any) => ({
+    id: `${src.type}-${src.id}`,  // "dataset-1" or "snapshot-2"
+    backendId: src.id,            // numeric backend id
+    sourceType: src.type,         // "dataset" | "snapshot"
+    name: src.name,
+    tableName: src.result_table || src.filename || src.name.toLowerCase(),
+    type: src.file_type as any,
+    status: "connected",          // default until proven otherwise
+    data: [],                     // preview rows can be fetched separately
+    columns: [],                  // filled when preview is loaded
+    backendDataset: null,
+  }));
+
+  return { sources };
+};
 /// ----------------------
 // Dashboard Types
 // ----------------------

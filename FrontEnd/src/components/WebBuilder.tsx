@@ -12,7 +12,7 @@ import {
   saveDashboard as apiSaveDashboard,
   listDashboards,
   loadDashboard,
-  Dashboard,
+  Dashboard
 } from '../services/api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -42,6 +42,7 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     activeDatasetId,
     getDashboard,
     saveDashboard,
+    refreshDatasets,
   } = useData();
 
   const [charts, setCharts] = useState<ChartConfig[]>([]);
@@ -51,22 +52,25 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [newDashboardName, setNewDashboardName] = useState('');
 
-  // ✅ Current dataset
+  // ✅ Fetch datasets on mount
+  useEffect(() => {
+    refreshDatasets();
+  }, [refreshDatasets]);
+
   const currentDataset = dataSources.find((ds) => ds.id === activeDatasetId) || null;
   const currentData = analyzedData || currentDataset;
 
-  // ✅ Reset UI if no dataset selected
+  // ✅ Reset only if no dataset is selected
   useEffect(() => {
     if (!activeDatasetId) {
       setCharts([]);
-      setFilters([]);
+      setFilters([]);   // only reset when NO dataset
       setSelectedChart(null);
       setAnalyzedData(null);
       setDashboards([]);
       return;
     }
 
-    // ✅ Restore charts for selected dataset (if saved)
     const ds = dataSources.find((d) => d.id === activeDatasetId);
     if (ds) {
       setAnalyzedData({
@@ -76,7 +80,7 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
         columns: ds.columns,
         timestamp: new Date(),
       });
-      setCharts(getDashboard(ds.id)); // restore local memory charts
+      setCharts(getDashboard(ds.id));
       fetchDashboards(ds.backendId);
     }
   }, [activeDatasetId, dataSources]);
@@ -86,11 +90,12 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     if (activeDatasetId) saveDashboard(activeDatasetId, charts);
   }, [charts, activeDatasetId, saveDashboard]);
 
-  // ✅ Handle dataset selection
+  // ✅ Handle dataset change
   const handleDatasetChange = (datasetId: string) => {
     if (!datasetId || datasetId === '__none') return;
 
     setActiveDataset(datasetId);
+
     const ds = dataSources.find((d) => d.id === datasetId);
     if (!ds) return;
 
@@ -102,10 +107,30 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
       timestamp: new Date(),
     });
 
-    setCharts(getDashboard(ds.id));
-    setFilters([]);
-    setSelectedChart(null);
+    const restoredCharts = getDashboard(ds.id);
+    setCharts(restoredCharts);
 
+    // ✅ Restore filters from the selected chart (if any)
+    if (selectedChart) {
+      const chart = restoredCharts.find((c) => c.id === selectedChart);
+      if (chart?.filters) {
+        setFilters(
+          Object.entries(chart.filters).map(([col, value]) => ({
+            id: `filter-${col}`,
+            type: 'slider', // 🔧 could extend to detect dynamically
+            label: col,
+            column: col,
+            value,
+          }))
+        );
+      } else {
+        setFilters([]);
+      }
+    } else {
+      setFilters([]);
+    }
+
+    setSelectedChart(null);
     fetchDashboards(ds.backendId);
   };
 
@@ -113,12 +138,7 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
   const fetchDashboards = async (datasetId: number) => {
     try {
       const list = await listDashboards(datasetId);
-      if (list.length > 0) {
-        setDashboards(list);
-        // don’t auto-load dashboard, let user pick manually
-      } else {
-        setDashboards([]);
-      }
+      setDashboards(list.length > 0 ? list : []);
     } catch (err) {
       console.error('Failed to fetch dashboards:', err);
       setDashboards([]);
@@ -156,28 +176,31 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
 
   // ✅ Chart handlers
   const handleAddChart = (chartType: ChartConfig['type']) => {
-    if (!currentData || !currentData.results?.length) return;
+    const dataRows = (currentData as any)?.results || (currentData as any)?.data;
+
+    if (!dataRows || !dataRows.length) {
+      alert('⚠️ Please select a dataset before adding a chart.');
+      return;
+    }
 
     const newChart: ChartConfig = {
       id: `chart-${Date.now()}`,
       type: chartType,
       title: `${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart`,
-      data: currentData.results,
+      data: dataRows,
       x: '',
       y: '',
       position: { x: charts.length * 50, y: charts.length * 50 },
       size: { width: 400, height: 300 },
       filters: {},
     };
+
     setCharts((prev) => [...prev, newChart]);
     setSelectedChart(newChart.id);
+    setActiveTab('dashboard');
   };
 
-  const handleUpdateChart = (
-    chartId: string,
-    updates: Partial<ChartConfig>,
-    mode: 'preview' | 'apply' = 'apply'
-  ) => {
+  const handleUpdateChart = (chartId: string, updates: Partial<ChartConfig>) => {
     setCharts((prev) =>
       prev.map((chart) => (chart.id === chartId ? { ...chart, ...updates } : chart))
     );
@@ -248,8 +271,8 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
               />
             </ResizablePanel>
             <ResizableHandle />
-            <ResizablePanel defaultSize={50} minSize={30}>
-              <div id="dashboard-area" className="flex-1 p-4 bg-white">
+            <ResizablePanel defaultSize={75} minSize={50}>
+              <div className="h-full min-h-0 overflow-y-auto p-4 bg-white">
                 <DashboardBuilder
                   charts={charts}
                   selectedChart={selectedChart}
@@ -263,7 +286,9 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
             </ResizablePanel>
             <ResizableHandle />
             <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
-              <ColumnsPanel />
+              <div className="h-full min-h-0">
+                <ColumnsPanel />
+              </div>
             </ResizablePanel>
           </ResizablePanelGroup>
         );
@@ -271,19 +296,23 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
         return (
           <ResizablePanelGroup direction="horizontal" className="h-full">
             <ResizablePanel defaultSize={75} minSize={50}>
-              <DashboardBuilder
-                charts={charts}
-                selectedChart={selectedChart}
-                onSelectChart={setSelectedChart}
-                onAddChart={handleAddChart}
-                onUpdateChart={handleUpdateChart}
-                onDeleteChart={handleDeleteChart}
-                filters={filters}
-              />
+              <div className="h-full min-h-0 overflow-y-auto p-4 bg-white">
+                <DashboardBuilder
+                  charts={charts}
+                  selectedChart={selectedChart}
+                  onSelectChart={setSelectedChart}
+                  onAddChart={handleAddChart}
+                  onUpdateChart={handleUpdateChart}
+                  onDeleteChart={handleDeleteChart}
+                  filters={filters}
+                />
+              </div>
             </ResizablePanel>
             <ResizableHandle />
             <ResizablePanel defaultSize={25} minSize={20} maxSize={35}>
-              <ColumnsPanel />
+              <div className="h-full min-h-0">
+                <ColumnsPanel />
+              </div>
             </ResizablePanel>
           </ResizablePanelGroup>
         );
@@ -291,14 +320,11 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full min-h-0 flex flex-col overflow-hidden">
       {/* Dataset selector */}
       <div className="border-b border-border p-4 flex items-center gap-3">
         <span className="text-sm font-medium">Dataset:</span>
-        <Select
-          onValueChange={handleDatasetChange}
-          value={activeDatasetId ?? undefined}
-        >
+        <Select onValueChange={handleDatasetChange} value={activeDatasetId ?? undefined}>
           <SelectTrigger className="w-64">
             <SelectValue placeholder="Choose dataset" />
           </SelectTrigger>
@@ -309,7 +335,7 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
               </SelectItem>
             ) : (
               dataSources.map((ds) => (
-                <SelectItem key={ds.id} value={String(ds.id)}>
+                <SelectItem key={ds.id} value={ds.id}>
                   {ds.name}
                 </SelectItem>
               ))
@@ -350,7 +376,7 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
         </div>
       </div>
 
-      <div className="flex-1">{renderContent()}</div>
+      <div className="flex-1 min-h-0 overflow-hidden">{renderContent()}</div>
     </div>
   );
 }

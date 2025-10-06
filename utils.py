@@ -14,12 +14,21 @@ async def load_dataset(file_path: str, file_type: str):
 
 
 async def get_data_preview(file_path: str, file_type: str, rows: int = 10):
-    """Get preview of the dataset as list of dicts."""
+    """Get preview of the dataset including columns and sample rows."""
     try:
         df = await load_dataset(file_path, file_type)
-        if len(df) > rows:
-            df = df.head(rows)
-        return df.to_dict('records')
+
+        preview_df = df.head(rows)
+
+        return {
+            "columns": list(preview_df.columns),
+            "rows": preview_df.to_dict(orient="records"),
+            "total_rows": len(df)
+        }
     except Exception as e:
         print(f"Error getting data preview: {e}")
-        return []
+        return {
+            "columns": [],
+            "rows": [],
+            "total_rows": 0
+        }
