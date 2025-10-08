@@ -43,6 +43,7 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     getDashboard,
     saveDashboard,
     refreshDatasets,
+    getActiveFilteredRows,
   } = useData();
 
   const [charts, setCharts] = useState<ChartConfig[]>([]);
@@ -58,13 +59,29 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
   }, [refreshDatasets]);
 
   const currentDataset = dataSources.find((ds) => ds.id === activeDatasetId) || null;
-  const currentData = analyzedData || currentDataset;
+  const filteredRows = getActiveFilteredRows();
+  const currentData = {
+  ...((analyzedData || currentDataset) ?? {}),
+  results: filteredRows.length > 0 ? filteredRows : (analyzedData?.results || currentDataset?.data || []),
+  };
+  // ✅ Keep analyzedData in sync with the selected dataset
+  useEffect(() => {
+    if (currentDataset && (!analyzedData || analyzedData.sourceId !== currentDataset.id)) {
+      setAnalyzedData({
+        sourceId: currentDataset.id,
+        query: 'SELECT * FROM data',
+        results: currentDataset.data,
+        columns: currentDataset.columns,
+        timestamp: new Date(),
+      });
+    }
+  }, [currentDataset, analyzedData, setAnalyzedData]);
 
   // Reset only if no dataset is selected
   useEffect(() => {
     if (!activeDatasetId) {
       setCharts([]);
-      setFilters([]);   
+      // setFilters([]);   
       setSelectedChart(null);
       setAnalyzedData(null);
       setDashboards([]);
