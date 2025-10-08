@@ -9,6 +9,14 @@ import {
   ChartConfig,
 } from '../services/api';
 
+export interface ColumnInfo {
+  name: string;
+  type: 'string' | 'number' | 'date';
+  originalName: string;
+  values?: any[];
+  range?: { min: number | string; max: number | string };
+}
+
 export interface DataSource {
   id: string;
   backendId: number;
@@ -18,7 +26,7 @@ export interface DataSource {
   type: 'csv' | 'database' | 'api' | 'cloud' | 'snapshot';
   status: 'connected' | 'pending' | 'error';
   data: any[];
-  columns: { name: string; type: 'string' | 'number' | 'date'; originalName: string }[];
+  columns: ColumnInfo[];
   backendDataset?: Dataset | null;
 }
 
@@ -26,7 +34,7 @@ export interface AnalyzedData {
   sourceId: string;
   query: string;
   results: any[];
-  columns: { name: string; type: 'string' | 'number' | 'date'; originalName: string }[];
+  columns: ColumnInfo[];
   timestamp: Date;
 }
 
@@ -50,6 +58,11 @@ interface DataContextType {
   getDashboard: (datasetId: string) => ChartConfig[];
   saveDashboard: (datasetId: string, charts: ChartConfig[]) => void;
   clearDashboard: (datasetId: string) => void;
+
+  // ✅ Added filter support
+  filters: any[];
+  setFilters: (filters: any[]) => void;
+  getActiveFilteredRows: () => any[];
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -60,23 +73,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [snapshots, setSnapshots] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzedData, setAnalyzedData] = useState<AnalyzedData | null>(null);
-
   const [activeDatasetId, setActiveDatasetId] = useState<string | null>(null);
   const [activeModule, setActiveModuleState] = useState<'sql' | 'web'>(() =>
     (localStorage.getItem('activeModule') as 'sql' | 'web') || 'sql'
   );
 
+  const [filters, setFilters] = useState<any[]>([]); // ✅ new
   const [dashboards, setDashboards] = useState<Record<string, ChartConfig[]>>(() => {
     const saved = localStorage.getItem('dashboards');
     return saved ? JSON.parse(saved) : {};
   });
 
-  // ✅ Persist dashboards between sessions
+  // ✅ Persist dashboards
   useEffect(() => {
     localStorage.setItem('dashboards', JSON.stringify(dashboards));
   }, [dashboards]);
 
-  // ✅ Reset dataset on switching to Web Builder
+  // ✅ Persist active module
   useEffect(() => {
     localStorage.setItem('activeModule', activeModule);
     if (activeModule === 'web') {
@@ -89,12 +102,48 @@ export function DataProvider({ children }: { children: ReactNode }) {
     refreshDatasets();
   }, []);
 
+  // ✅ Enhanced column type detection
   const inferColumnType = (col: string, sampleRows: any[]): 'string' | 'number' | 'date' => {
-    const values = sampleRows.map((r) => r[col]).filter(Boolean).slice(0, 5);
+    const values = sampleRows.map((r) => r[col]).filter(Boolean).slice(0, 10);
     if (values.length === 0) return 'string';
     if (values.every((v) => !isNaN(Number(v)))) return 'number';
     if (values.every((v) => !isNaN(Date.parse(v)))) return 'date';
     return 'string';
+  };
+
+  // ✅ Generate unique values / ranges for filters
+  const enrichColumnsWithStats = (rows: any[], columns: string[]) => {
+    if (!rows || rows.length === 0) return [];
+
+    return columns.map((col) => {
+      const values = rows.map((r) => r[col]).filter((v) => v !== null && v !== undefined);
+      const type = inferColumnType(col, rows);
+
+      const uniqueValues =
+        type === 'string'
+          ? Array.from(new Set(values))
+          : type === 'date'
+          ? Array.from(new Set(values.map((v) => new Date(v).toISOString().split('T')[0])))
+          : [];
+
+      const range =
+        type === 'number'
+          ? { min: Math.min(...values), max: Math.max(...values) }
+          : type === 'date'
+          ? {
+              min: new Date(Math.min(...values.map((v) => new Date(v).getTime()))).toISOString().split('T')[0],
+              max: new Date(Math.max(...values.map((v) => new Date(v).getTime()))).toISOString().split('T')[0],
+            }
+          : undefined;
+
+      return {
+        name: col,
+        type,
+        originalName: col,
+        values: uniqueValues.length > 0 ? uniqueValues : undefined,
+        range,
+      };
+    });
   };
 
   const refreshDatasets = async () => {
@@ -111,6 +160,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
             const preview = await getDatasetPreview(dataset.id, 20);
             rows = preview.rows || [];
           } catch {}
+
+          const enrichedCols = enrichColumnsWithStats(rows, columns);
+
           return {
             id: `dataset-${dataset.id}`,
             backendId: dataset.id,
@@ -120,11 +172,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             type: dataset.file_type as any,
             status: dataset.is_processed ? 'connected' : 'pending',
             data: rows,
-            columns: columns.map((c) => ({
-              name: c,
-              type: inferColumnType(c, rows),
-              originalName: c,
-            })),
+            columns: enrichedCols,
             backendDataset: dataset,
           };
         })
@@ -137,11 +185,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
             preview = await getSnapshotPreview(snap.id, 20);
           } catch {}
           const rows = preview.preview || [];
-          const cols = (preview.columns || []).map((c: any) =>
-            typeof c === 'string'
-              ? { name: c, type: inferColumnType(c, rows), originalName: c }
-              : { name: c.name, type: inferColumnType(c.name, rows), originalName: c.name }
+          const colNames = (preview.columns || []).map((c: any) =>
+            typeof c === 'string' ? c : c.name
           );
+          const enrichedCols = enrichColumnsWithStats(rows, colNames);
+
           return {
             id: `snapshot-${snap.id}`,
             backendId: snap.id,
@@ -151,7 +199,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             type: 'snapshot',
             status: 'connected',
             data: rows,
-            columns: cols,
+            columns: enrichedCols,
             backendDataset: null,
           };
         })
@@ -166,7 +214,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addDataSource = (src: DataSource) => setDataSources((prev) => [...prev, src]);
   const updateDataSource = (id: string, partial: Partial<DataSource>) =>
     setDataSources((prev) => prev.map((ds) => (ds.id === id ? { ...ds, ...partial } : ds)));
-  const removeDataSource = (id: string) => setDataSources((prev) => prev.filter((ds) => ds.id !== id));
+  const removeDataSource = (id: string) =>
+    setDataSources((prev) => prev.filter((ds) => ds.id !== id));
 
   const addDatasetAsSource = (dataset: Dataset) => {
     const columns = parseColumnsInfo(dataset.columns_info);
@@ -179,23 +228,91 @@ export function DataProvider({ children }: { children: ReactNode }) {
       type: dataset.file_type as any,
       status: dataset.is_processed ? 'connected' : 'pending',
       data: [],
-      columns: columns.map((c) => ({ name: c, type: 'string', originalName: c })),
+      columns: columns.map((c) => ({
+        name: c,
+        type: 'string',
+        originalName: c,
+      })),
       backendDataset: dataset,
     };
     setDataSources((prev) => [...prev, newSource]);
   };
 
   const getDashboard = (datasetId: string | number) =>
-  dashboards[String(datasetId)] || [];
+    dashboards[String(datasetId)] || [];
 
-const saveDashboard = (datasetId: string | number, charts: ChartConfig[]) =>
-  setDashboards((prev) => ({ ...prev, [String(datasetId)]: charts }));
+  const saveDashboard = (datasetId: string | number, charts: ChartConfig[]) =>
+    setDashboards((prev) => ({ ...prev, [String(datasetId)]: charts }));
 
-const clearDashboard = (datasetId: string | number) =>
-  setDashboards((prev) => {
-    const { [String(datasetId)]: _, ...rest } = prev;
-    return rest;
-  });
+  const clearDashboard = (datasetId: string | number) =>
+    setDashboards((prev) => {
+      const { [String(datasetId)]: _, ...rest } = prev;
+      return rest;
+    });
+
+  // ---------- FILTER ENGINE ----------
+  const applyFilters = (rows: any[], fs: any[]) => {
+    if (!rows || rows.length === 0 || !fs || fs.length === 0) return rows;
+
+    const safe = (v: any) => (v === null || v === undefined ? '' : v);
+
+    return rows.filter((row) => {
+      return fs.every((f) => {
+        // ✅ Safe column lookup (case-insensitive)
+        const colKey = Object.keys(row).find(
+          (k) => k.toLowerCase() === f.column.toLowerCase()
+        );
+        const val = colKey ? row[colKey] : undefined;
+
+        switch (f.type) {
+          case 'checkbox':
+            if (!Array.isArray(f.value) || f.value.length === 0) return true;
+            return f.value.includes(val);
+
+          // ✅ Fixed Radio / Select logic
+          case 'radio':
+          case 'select': {
+            if (!f.value || f.value === '' || f.value === null) return true;
+            const cell = safe(val);
+            return (
+              String(cell).toLowerCase().trim() ===
+              String(f.value).toLowerCase().trim()
+            );
+          }
+
+          case 'slider': {
+            if (!f.value || typeof val !== 'number') return true;
+            const { min, max } = f.value;
+            return (
+              (min === undefined || val >= Number(min)) &&
+              (max === undefined || val <= Number(max))
+            );
+          }
+
+          case 'date': {
+            if (!f.value || (!f.value.start && !f.value.end)) return true;
+            const rowTime = val ? new Date(val).getTime() : NaN;
+            if (Number.isNaN(rowTime)) return false;
+            const start = f.value.start
+              ? new Date(f.value.start).getTime()
+              : -Infinity;
+            const end = f.value.end ? new Date(f.value.end).getTime() : Infinity;
+            return rowTime >= start && rowTime <= end;
+          }
+
+          default:
+            return true;
+        }
+      });
+    });
+  };
+
+  // ✅ Get filtered data for active dataset
+  const getActiveFilteredRows = () => {
+    const active = dataSources.find((ds) => ds.id === activeDatasetId);
+    if (!active) return [];
+    return applyFilters(active.data, filters);
+  };
 
   return (
     <DataContext.Provider
@@ -219,6 +336,11 @@ const clearDashboard = (datasetId: string | number) =>
         getDashboard,
         saveDashboard,
         clearDashboard,
+
+        // ✅ new
+        filters,
+        setFilters,
+        getActiveFilteredRows,
       }}
     >
       {children}

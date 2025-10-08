@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useData } from '../DataContext';
 import { Plus, Move, Maximize2, Grid3X3 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -8,8 +9,9 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '../ui/dropdown-menu';
-import { ChartConfig, FilterConfig } from '../WebBuilder';
+import {FilterConfig } from '../WebBuilder';
 import { ResizableChart } from './ResizableChart';
+import { ChartConfig, } from '../../services/api'
 
 interface DashboardBuilderProps {
   charts: ChartConfig[];
@@ -32,6 +34,8 @@ export function DashboardBuilder({
 }: DashboardBuilderProps) {
   const [isGridMode, setIsGridMode] = useState(true);
   const [gridCols, setGridCols] = useState(2);
+  const { getActiveFilteredRows } = useData();
+  const globalFilteredRows = getActiveFilteredRows();
 
   // 🔑 temporary + rollback states
   const [tempEdits, setTempEdits] = useState<Record<string, Partial<ChartConfig>>>({});
@@ -246,7 +250,8 @@ export function DashboardBuilder({
       {isGridMode ? (
         <div className={`grid ${getGridColsClass()} gap-6 p-6`}>
           {charts.map((chart) => {
-            const filteredData = applyFiltersToData(chart.data, chart.filters);
+            const baseData = globalFilteredRows.length > 0 ? globalFilteredRows : chart.data;
+            const filteredData = applyFiltersToData(baseData, chart.filters);
             const preview = tempEdits[chart.id] || {};
             const previewChart = { ...chart, ...preview, data: filteredData };
             return (
@@ -268,7 +273,8 @@ export function DashboardBuilder({
           onClick={() => onSelectChart(null)}
         >
           {charts.map((chart) => {
-            const filteredData = applyFiltersToData(chart.data, chart.filters);
+            const baseData = globalFilteredRows.length > 0 ? globalFilteredRows : chart.data;
+            const filteredData = applyFiltersToData(baseData, chart.filters);
             const preview = tempEdits[chart.id] || {};
             const previewChart = { ...chart, ...preview, data: filteredData };
             return (
