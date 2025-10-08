@@ -220,13 +220,25 @@ export function ExportShare({ charts, filters }: ExportShareProps) {
   };
 
   const generateShareLink = () => {
-    const shareUrl = `https://dataviz-pro.com/dashboard/${dashboardName
-      .toLowerCase()
-      .replace(/\s+/g, "-")}-${Date.now()}`;
-    navigator.clipboard.writeText(shareUrl);
-    toast.success("Share link copied to clipboard");
-  };
+  const base = window.location.origin;
 
+  // Try to use the currently saved dashboard if available
+  const dashName =
+    charts.length > 0
+      ? dashboardName || charts[0].title || "My Dashboard"
+      : dashboardName || "Untitled";
+
+  const shareUrl = `${base}/?tab=webbuilder&dashboard=${encodeURIComponent(dashName)}`;
+
+  navigator.clipboard
+    .writeText(shareUrl)
+    .then(() => {
+      toast.success(`✅ Share link copied:\n${shareUrl}`);
+    })
+    .catch(() => {
+      toast.error("Failed to copy link — check browser permissions");
+    });
+};
   const exportOptions = [
     {
       value: "pdf",
