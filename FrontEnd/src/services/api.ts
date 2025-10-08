@@ -228,6 +228,13 @@ export interface ChartConfig {
   position: { x: number; y: number };
   size: { width: number; height: number };
   filters: Record<string, any>;
+
+  // ✅ Optional display fields
+  legendLabel?: string;      // Custom label for legend (used in ChartRenderer & ConfigPanel)
+  xLabel?: string;           // Optional X-axis label override
+  yLabel?: string;           // Optional Y-axis label override
+  color?: string;            // Optional primary color override for chart
+  description?: string;      // Optional description or tooltip for chart
 }
 
 export interface Dashboard {
