@@ -16,6 +16,7 @@ import {
 } from '../services/api';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { toast } from 'sonner';
 
 export interface FilterConfig {
   id: string;
@@ -49,11 +50,51 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
   const [charts, setCharts] = useState<ChartConfig[]>([]);
   const [filters, setFilters] = useState<FilterConfig[]>([]);
   const [selectedChart, setSelectedChart] = useState<string | null>(null);
-
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [newDashboardName, setNewDashboardName] = useState('');
 
-  // Fetch datasets on mount
+  // ✅ Load dashboard (by ID or name)
+  const handleLoadFromDB = async (idOrName: number | string) => {
+    try {
+      let dbDashboard;
+      if (typeof idOrName === "string") {
+        const list = await Promise.all(
+          dataSources.map((ds) => listDashboards(ds.backendId))
+        );
+        const flat = list.flat();
+        const found = flat.find(
+          (d) => d.name.toLowerCase() === idOrName.toLowerCase()
+        );
+        if (!found) {
+          console.warn("Dashboard not found:", idOrName);
+          toast.error("Dashboard not found");
+          return;
+        }
+        dbDashboard = await loadDashboard(found.id);
+      } else {
+        dbDashboard = await loadDashboard(idOrName);
+      }
+
+      setCharts(dbDashboard.config || []);
+      setNewDashboardName(dbDashboard.name);
+      toast.success(`✅ Loaded dashboard "${dbDashboard.name}"`);
+    } catch (err) {
+      console.error("Load failed:", err);
+      toast.error("❌ Failed to load dashboard");
+    }
+  };
+
+  // ✅ Auto-load shared dashboard from URL (e.g., ?tab=webbuilder&dashboard=MyDashboard)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    const dash = params.get("dashboard");
+
+    if (tab === "webbuilder") setActiveTab("export");
+    if (dash) handleLoadFromDB(dash);
+  }, []);
+
+  // ✅ Fetch datasets on mount
   useEffect(() => {
     refreshDatasets();
   }, [refreshDatasets]);
@@ -61,10 +102,14 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
   const currentDataset = dataSources.find((ds) => ds.id === activeDatasetId) || null;
   const filteredRows = getActiveFilteredRows();
   const currentData = {
-  ...((analyzedData || currentDataset) ?? {}),
-  results: filteredRows.length > 0 ? filteredRows : (analyzedData?.results || currentDataset?.data || []),
+    ...((analyzedData || currentDataset) ?? {}),
+    results:
+      filteredRows.length > 0
+        ? filteredRows
+        : analyzedData?.results || currentDataset?.data || [],
   };
-  // ✅ Keep analyzedData in sync with the selected dataset
+
+  // ✅ Keep analyzedData in sync
   useEffect(() => {
     if (currentDataset && (!analyzedData || analyzedData.sourceId !== currentDataset.id)) {
       setAnalyzedData({
@@ -77,11 +122,10 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     }
   }, [currentDataset, analyzedData, setAnalyzedData]);
 
-  // Reset only if no dataset is selected
+  // ✅ Reset when no dataset
   useEffect(() => {
     if (!activeDatasetId) {
       setCharts([]);
-      // setFilters([]);   
       setSelectedChart(null);
       setAnalyzedData(null);
       setDashboards([]);
@@ -102,15 +146,14 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     }
   }, [activeDatasetId, dataSources]);
 
-  // Persist dashboard in memory
+  // ✅ Save dashboard persistently
   useEffect(() => {
     if (activeDatasetId) saveDashboard(activeDatasetId, charts);
   }, [charts, activeDatasetId, saveDashboard]);
 
-  // Handle dataset change
+  // ✅ Handle dataset change
   const handleDatasetChange = (datasetId: string) => {
     if (!datasetId || datasetId === '__none') return;
-
     setActiveDataset(datasetId);
 
     const ds = dataSources.find((d) => d.id === datasetId);
@@ -127,14 +170,13 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     const restoredCharts = getDashboard(ds.id);
     setCharts(restoredCharts);
 
-    // Restore filters from the selected chart (if any)
     if (selectedChart) {
       const chart = restoredCharts.find((c) => c.id === selectedChart);
       if (chart?.filters) {
         setFilters(
           Object.entries(chart.filters).map(([col, value]) => ({
             id: `filter-${col}`,
-            type: 'slider', 
+            type: 'slider',
             label: col,
             column: col,
             value,
@@ -151,7 +193,7 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     fetchDashboards(ds.backendId);
   };
 
-  // Fetch dashboards from backend
+  // ✅ Fetch dashboards
   const fetchDashboards = async (datasetId: number) => {
     try {
       const list = await listDashboards(datasetId);
@@ -162,41 +204,28 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     }
   };
 
-  // Save dashboard to backend
+  // ✅ Save dashboard to DB
   const handleSaveToDB = async () => {
     if (!currentDataset || charts.length === 0 || !newDashboardName.trim()) {
-      alert('⚠️ Please select a dataset, name your dashboard, and add charts.');
+      toast.error('⚠️ Please select a dataset, name your dashboard, and add charts.');
       return;
     }
     try {
       const saved = await apiSaveDashboard(currentDataset.backendId, newDashboardName, charts);
-      alert(`Saved dashboard "${saved.name}"`);
+      toast.success(`💾 Saved dashboard "${saved.name}"`);
       setNewDashboardName('');
       fetchDashboards(currentDataset.backendId);
     } catch (err) {
       console.error('Save failed:', err);
-      alert('Failed to save dashboard');
+      toast.error('❌ Failed to save dashboard');
     }
   };
 
-  // Load dashboard
-  const handleLoadFromDB = async (id: number) => {
-    try {
-      const dbDashboard = await loadDashboard(id);
-      setCharts(dbDashboard.config);
-      alert(`Loaded dashboard "${dbDashboard.name}"`);
-    } catch (err) {
-      console.error('Load failed:', err);
-      alert('Failed to load dashboard');
-    }
-  };
-
-  // Chart handlers
+  // ✅ Chart Handlers
   const handleAddChart = (chartType: ChartConfig['type']) => {
     const dataRows = (currentData as any)?.results || (currentData as any)?.data;
-
     if (!dataRows || !dataRows.length) {
-      alert('⚠️ Please select a dataset before adding a chart.');
+      toast.error('⚠️ Please select a dataset before adding a chart.');
       return;
     }
 
@@ -228,7 +257,7 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     if (selectedChart === chartId) setSelectedChart(null);
   };
 
-  // Filter handlers
+  // ✅ Filter handlers
   const handleAddFilter = (filter: Omit<FilterConfig, 'id'>) =>
     setFilters((prev) => [...prev, { ...filter, id: `filter-${Date.now()}` }]);
 
@@ -249,12 +278,12 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
   const handleDeleteFilter = (filterId: string) =>
     setFilters((prev) => prev.filter((f) => f.id !== filterId));
 
-  // Render content
+  // ✅ Render main layout
   const renderContent = () => {
-    if (!activeDatasetId) {
+    if (!activeDatasetId && charts.length === 0) {
       return (
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
-          Please select a dataset to start building a dashboard.
+          Please select a dataset or open a shared dashboard.
         </div>
       );
     }
@@ -269,37 +298,34 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
           />
         );
       case 'export':
-      return (
-        <div className="h-full w-full relative">
-          {/* 👇 Hidden but mounted dashboard (for html2canvas to capture) */}
-          <div
-            id="dashboard-export-wrapper"
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              opacity: 0.01, // invisible but keeps layout
-              pointerEvents: "none",
-              zIndex: -10,
-              minHeight: "100vh",
-            }}
-          >
-            <DashboardBuilder
-              charts={charts}
-              selectedChart={selectedChart}
-              onSelectChart={setSelectedChart}
-              onAddChart={handleAddChart}
-              onUpdateChart={handleUpdateChart}
-              onDeleteChart={handleDeleteChart}
-              filters={filters}
-            />
+        return (
+          <div className="h-full w-full relative">
+            <div
+              id="dashboard-export-wrapper"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                opacity: 0.01,
+                pointerEvents: "none",
+                zIndex: -10,
+                minHeight: "100vh",
+              }}
+            >
+              <DashboardBuilder
+                charts={charts}
+                selectedChart={selectedChart}
+                onSelectChart={setSelectedChart}
+                onAddChart={handleAddChart}
+                onUpdateChart={handleUpdateChart}
+                onDeleteChart={handleDeleteChart}
+                filters={filters}
+              />
+            </div>
+            <ExportShare charts={charts} filters={filters} />
           </div>
-
-          {/* Visible export UI */}
-          <ExportShare charts={charts} filters={filters} />
-        </div>
-      );
+        );
       case 'filters':
         return (
           <ResizablePanelGroup direction="horizontal" className="h-full">
