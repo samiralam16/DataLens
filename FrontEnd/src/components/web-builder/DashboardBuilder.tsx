@@ -9,9 +9,9 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '../ui/dropdown-menu';
-import {FilterConfig } from '../WebBuilder';
+import { FilterConfig } from '../WebBuilder';
 import { ResizableChart } from './ResizableChart';
-import { ChartConfig, } from '../../services/api'
+import { ChartConfig } from '../../services/api';
 
 interface DashboardBuilderProps {
   charts: ChartConfig[];
@@ -37,7 +37,6 @@ export function DashboardBuilder({
   const { getActiveFilteredRows } = useData();
   const globalFilteredRows = getActiveFilteredRows();
 
-  // 🔑 temporary + rollback states
   const [tempEdits, setTempEdits] = useState<Record<string, Partial<ChartConfig>>>({});
   const [lastApplied, setLastApplied] = useState<Record<string, ChartConfig>>({});
 
@@ -51,17 +50,15 @@ export function DashboardBuilder({
     { type: 'geo', label: 'Geographic', icon: '🗺️' }
   ];
 
-  // ✅ safer filter application
   const applyFiltersToData = (chartData: any[], chartFilters: Record<string, any>) => {
     if (!Array.isArray(chartData) || chartData.length === 0) return chartData;
 
     let filteredData = [...chartData];
-
     filters.forEach(filter => {
       const filterValue =
         chartFilters[filter.column] !== undefined
           ? chartFilters[filter.column]
-          : filter.value;
+          : (filter as any).value;
 
       if (filterValue === undefined || filterValue === null) return;
       if (!Object.prototype.hasOwnProperty.call(chartData[0], filter.column)) return;
@@ -147,7 +144,7 @@ export function DashboardBuilder({
             Start by adding charts to create interactive visualizations and dashboards.
           </p>
           <div className="grid grid-cols-2 gap-3">
-            {chartTypes.slice(0, 4).map((chartType) => (
+            {chartTypes.slice(0, 4).map(chartType => (
               <Button
                 key={chartType.type}
                 variant="outline"
@@ -166,7 +163,7 @@ export function DashboardBuilder({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              {chartTypes.slice(4).map((chartType) => (
+              {chartTypes.slice(4).map(chartType => (
                 <DropdownMenuItem
                   key={chartType.type}
                   onClick={() => onAddChart(chartType.type)}
@@ -183,116 +180,117 @@ export function DashboardBuilder({
   }
 
   return (
-  <div className="h-full min-h-0 flex flex-col bg-background">
-    <div className="border-b border-border p-4 flex items-center justify-between">
-      <div>
-        <h2 className="text-lg font-semibold">Dashboard Builder</h2>
-        <p className="text-sm text-muted-foreground">
-          {isGridMode ? `Grid layout (${gridCols} columns)` : 'Free-form drag and drop view'}
-        </p>
-      </div>
-      <div className="flex items-center gap-2">
-        <Badge variant="secondary">
-          {charts.length} chart{charts.length !== 1 ? 's' : ''}
-        </Badge>
-        {isGridMode && (
+    <div className="h-full min-h-0 flex flex-col bg-background">
+      {/* Toolbar */}
+      <div className="border-b border-border p-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Dashboard Builder</h2>
+          <p className="text-sm text-muted-foreground">
+            {isGridMode ? `Grid layout (${gridCols} columns)` : 'Free-form drag and drop view'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">
+            {charts.length} chart{charts.length !== 1 ? 's' : ''}
+          </Badge>
+          {isGridMode && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Grid3X3 className="h-4 w-4 mr-1" />
+                  {gridCols} Cols
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {[1, 2, 3, 4].map(cols => (
+                  <DropdownMenuItem
+                    key={cols}
+                    onClick={() => setGridCols(cols)}
+                    className={gridCols === cols ? 'bg-accent' : ''}
+                  >
+                    {cols} Column{cols !== 1 ? 's' : ''}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
-                <Grid3X3 className="h-4 w-4 mr-1" />
-                {gridCols} Cols
+                <Plus className="h-4 w-4 mr-1" />
+                Add Chart
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              {[1, 2, 3, 4].map((cols) => (
+              {chartTypes.map(chartType => (
                 <DropdownMenuItem
-                  key={cols}
-                  onClick={() => setGridCols(cols)}
-                  className={gridCols === cols ? 'bg-accent' : ''}
+                  key={chartType.type}
+                  onClick={() => onAddChart(chartType.type)}
                 >
-                  {cols} Column{cols !== 1 ? 's' : ''}
+                  <span className="mr-2">{chartType.icon}</span>
+                  {chartType.label}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsGridMode(!isGridMode)}
+          >
+            {isGridMode ? <Move className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {isGridMode ? 'Free Form' : 'Grid View'}
+          </Button>
+        </div>
+      </div>
+
+      {/* ✅ Dashboard content with exportable ID */}
+      <div id="dashboard-preview" className="flex-1 min-h-0 overflow-y-auto scroll-smooth bg-white p-6">
+        {isGridMode ? (
+          <div className={`grid ${getGridColsClass()} gap-6`}>
+            {charts.map(chart => {
+              const baseData = globalFilteredRows.length > 0 ? globalFilteredRows : chart.data;
+              const filteredData = applyFiltersToData(baseData, chart.filters);
+              const preview = tempEdits[chart.id] || {};
+              const previewChart = { ...chart, ...preview, data: filteredData };
+              return (
+                <ResizableChart
+                  key={chart.id}
+                  chart={previewChart}
+                  isSelected={selectedChart === chart.id}
+                  onSelect={() => onSelectChart(chart.id)}
+                  onUpdate={(updates, mode) => handleChartUpdate(chart.id, updates, mode)}
+                  onDelete={() => onDeleteChart(chart.id)}
+                  isGridMode={true}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div
+            className="relative w-full h-full min-h-[800px] bg-grid-pattern p-4"
+            onClick={() => onSelectChart(null)}
+          >
+            {charts.map(chart => {
+              const baseData = globalFilteredRows.length > 0 ? globalFilteredRows : chart.data;
+              const filteredData = applyFiltersToData(baseData, chart.filters);
+              const preview = tempEdits[chart.id] || {};
+              const previewChart = { ...chart, ...preview, data: filteredData };
+              return (
+                <ResizableChart
+                  key={chart.id}
+                  chart={previewChart}
+                  isSelected={selectedChart === chart.id}
+                  onSelect={() => onSelectChart(chart.id)}
+                  onUpdate={(updates, mode) => handleChartUpdate(chart.id, updates, mode)}
+                  onDelete={() => onDeleteChart(chart.id)}
+                  isGridMode={false}
+                />
+              );
+            })}
+          </div>
         )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Plus className="h-4 w-4 mr-1" />
-              Add Chart
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            {chartTypes.map((chartType) => (
-              <DropdownMenuItem
-                key={chartType.type}
-                onClick={() => onAddChart(chartType.type)}
-              >
-                <span className="mr-2">{chartType.icon}</span>
-                {chartType.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setIsGridMode(!isGridMode)}
-        >
-          {isGridMode ? <Move className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          {isGridMode ? 'Free Form' : 'Grid View'}
-        </Button>
       </div>
     </div>
-
-    <div className="flex-1 min-h-0 overflow-y-auto scroll-smooth relative">
-      {isGridMode ? (
-        <div className={`grid ${getGridColsClass()} gap-6 p-6`}>
-          {charts.map((chart) => {
-            const baseData = globalFilteredRows.length > 0 ? globalFilteredRows : chart.data;
-            const filteredData = applyFiltersToData(baseData, chart.filters);
-            const preview = tempEdits[chart.id] || {};
-            const previewChart = { ...chart, ...preview, data: filteredData };
-            return (
-              <ResizableChart
-                key={chart.id}
-                chart={previewChart}
-                isSelected={selectedChart === chart.id}
-                onSelect={() => onSelectChart(chart.id)}
-                onUpdate={(updates, mode) => handleChartUpdate(chart.id, updates, mode)}
-                onDelete={() => onDeleteChart(chart.id)}
-                isGridMode={true}
-              />
-            );
-          })}
-        </div>
-      ) : (
-        <div
-          className="relative w-full h-full min-h-[800px] bg-grid-pattern p-4"
-          onClick={() => onSelectChart(null)}
-        >
-          {charts.map((chart) => {
-            const baseData = globalFilteredRows.length > 0 ? globalFilteredRows : chart.data;
-            const filteredData = applyFiltersToData(baseData, chart.filters);
-            const preview = tempEdits[chart.id] || {};
-            const previewChart = { ...chart, ...preview, data: filteredData };
-            return (
-              <ResizableChart
-                key={chart.id}
-                chart={previewChart}
-                isSelected={selectedChart === chart.id}
-                onSelect={() => onSelectChart(chart.id)}
-                onUpdate={(updates, mode) => handleChartUpdate(chart.id, updates, mode)}
-                onDelete={() => onDeleteChart(chart.id)}
-                isGridMode={false}
-              />
-            );
-          })}
-        </div>
-      )}
-    </div>
-  </div>
-);
-
+  );
 }
