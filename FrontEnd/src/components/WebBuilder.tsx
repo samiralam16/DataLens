@@ -269,7 +269,37 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
           />
         );
       case 'export':
-        return <ExportShare charts={charts} filters={filters} />;
+      return (
+        <div className="h-full w-full relative">
+          {/* 👇 Hidden but mounted dashboard (for html2canvas to capture) */}
+          <div
+            id="dashboard-export-wrapper"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              opacity: 0.01, // invisible but keeps layout
+              pointerEvents: "none",
+              zIndex: -10,
+              minHeight: "100vh",
+            }}
+          >
+            <DashboardBuilder
+              charts={charts}
+              selectedChart={selectedChart}
+              onSelectChart={setSelectedChart}
+              onAddChart={handleAddChart}
+              onUpdateChart={handleUpdateChart}
+              onDeleteChart={handleDeleteChart}
+              filters={filters}
+            />
+          </div>
+
+          {/* Visible export UI */}
+          <ExportShare charts={charts} filters={filters} />
+        </div>
+      );
       case 'filters':
         return (
           <ResizablePanelGroup direction="horizontal" className="h-full">
