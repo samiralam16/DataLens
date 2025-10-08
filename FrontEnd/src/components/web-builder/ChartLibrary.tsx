@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { ChartRenderer } from './ChartRenderer';
-import { ChartConfig } from '../WebBuilder';
+import { ChartConfig } from '../../services/api';
 import { 
   Dialog, 
   DialogContent, 
@@ -351,38 +351,6 @@ export function ChartLibrary({ onAddChart, existingCharts, onUpdateChart }: Char
           <p className="text-muted-foreground text-sm">
             Try adjusting your search terms or category filter
           </p>
-        </div>
-      )}
-
-      {existingCharts.length > 0 && (
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold mb-4">Your Charts</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {existingCharts.map((chart) => (
-              <Card key={chart.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm">{chart.title}</CardTitle>
-                    <span className="text-lg">{chartTypeIcons[chart.type]}</span>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-32 border rounded overflow-hidden bg-muted/20 mb-3">
-                    <ChartRenderer chart={chart} height={128} />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1">
-                      <Copy className="h-3 w-3 mr-1" />
-                      Duplicate
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <Eye className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
         </div>
       )}
     </div>

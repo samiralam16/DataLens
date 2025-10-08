@@ -1,5 +1,5 @@
 import { 
-  BarChart, LineChart, PieChart, ScatterChart,
+  BarChart, LineChart, PieChart, ScatterChart, Treemap,
   Bar, Line, Pie, Scatter, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer 
@@ -27,8 +27,7 @@ export function ChartRenderer({ chart, height = 300 }: ChartRendererProps) {
   }
 
   const commonProps = { data: chart.data, margin: { top: 5, right: 30, left: 20, bottom: 5 } };
-  const legendName = chart.legendLabel || chart.y;  // ✅ prefer custom legend
-
+  const legendName = chart.legendLabel || chart.y; 
   switch (chart.type) {
     case 'bar':
       return (
@@ -95,10 +94,43 @@ export function ChartRenderer({ chart, height = 300 }: ChartRendererProps) {
         </ResponsiveContainer>
       );
 
-    // heatmap, treemap, geo unchanged…
+    case 'heatmap':
+      return (
+        <ResponsiveContainer width="100%" height={height}>
+          <BarChart {...commonProps} layout="vertical">
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis type="number" dataKey="value" />
+            <YAxis type="category" dataKey={chart.y} />
+            <Tooltip />
+            <Legend formatter={() => legendName} />
+            <Bar dataKey="value" name={legendName}>
+              {chart.data.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={`rgba(255, ${180 - entry.value}, ${100 + index * 10}, 0.8)`}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      );
+
+    case 'treemap':
+      return (
+        <ResponsiveContainer width="100%" height={height}>
+          <Treemap
+            data={chart.data}
+            dataKey={chart.y}
+            nameKey={chart.x}
+            stroke="#fff"
+            fill="#82ca9d"
+            contentStyle={{ fontSize: 12 }}
+          />
+        </ResponsiveContainer>
+      );
     default:
       return <div className="flex items-center justify-center h-full text-muted-foreground">
         <div className="text-center"><div className="text-4xl mb-2">❓</div>
         <p className="text-sm">Unsupported chart type</p></div></div>;
   }
-}
+};

@@ -52,7 +52,7 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [newDashboardName, setNewDashboardName] = useState('');
 
-  // ✅ Fetch datasets on mount
+  // Fetch datasets on mount
   useEffect(() => {
     refreshDatasets();
   }, [refreshDatasets]);
@@ -60,11 +60,11 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
   const currentDataset = dataSources.find((ds) => ds.id === activeDatasetId) || null;
   const currentData = analyzedData || currentDataset;
 
-  // ✅ Reset only if no dataset is selected
+  // Reset only if no dataset is selected
   useEffect(() => {
     if (!activeDatasetId) {
       setCharts([]);
-      setFilters([]);   // only reset when NO dataset
+      setFilters([]);   
       setSelectedChart(null);
       setAnalyzedData(null);
       setDashboards([]);
@@ -85,12 +85,12 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     }
   }, [activeDatasetId, dataSources]);
 
-  // ✅ Persist dashboard in memory
+  // Persist dashboard in memory
   useEffect(() => {
     if (activeDatasetId) saveDashboard(activeDatasetId, charts);
   }, [charts, activeDatasetId, saveDashboard]);
 
-  // ✅ Handle dataset change
+  // Handle dataset change
   const handleDatasetChange = (datasetId: string) => {
     if (!datasetId || datasetId === '__none') return;
 
@@ -110,14 +110,14 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     const restoredCharts = getDashboard(ds.id);
     setCharts(restoredCharts);
 
-    // ✅ Restore filters from the selected chart (if any)
+    // Restore filters from the selected chart (if any)
     if (selectedChart) {
       const chart = restoredCharts.find((c) => c.id === selectedChart);
       if (chart?.filters) {
         setFilters(
           Object.entries(chart.filters).map(([col, value]) => ({
             id: `filter-${col}`,
-            type: 'slider', // 🔧 could extend to detect dynamically
+            type: 'slider', 
             label: col,
             column: col,
             value,
@@ -134,7 +134,7 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     fetchDashboards(ds.backendId);
   };
 
-  // ✅ Fetch dashboards from backend
+  // Fetch dashboards from backend
   const fetchDashboards = async (datasetId: number) => {
     try {
       const list = await listDashboards(datasetId);
@@ -145,7 +145,7 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     }
   };
 
-  // ✅ Save dashboard to backend
+  // Save dashboard to backend
   const handleSaveToDB = async () => {
     if (!currentDataset || charts.length === 0 || !newDashboardName.trim()) {
       alert('⚠️ Please select a dataset, name your dashboard, and add charts.');
@@ -153,28 +153,28 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     }
     try {
       const saved = await apiSaveDashboard(currentDataset.backendId, newDashboardName, charts);
-      alert(`✅ Saved dashboard "${saved.name}"`);
+      alert(`Saved dashboard "${saved.name}"`);
       setNewDashboardName('');
       fetchDashboards(currentDataset.backendId);
     } catch (err) {
       console.error('Save failed:', err);
-      alert('❌ Failed to save dashboard');
+      alert('Failed to save dashboard');
     }
   };
 
-  // ✅ Load dashboard
+  // Load dashboard
   const handleLoadFromDB = async (id: number) => {
     try {
       const dbDashboard = await loadDashboard(id);
       setCharts(dbDashboard.config);
-      alert(`✅ Loaded dashboard "${dbDashboard.name}"`);
+      alert(`Loaded dashboard "${dbDashboard.name}"`);
     } catch (err) {
       console.error('Load failed:', err);
-      alert('❌ Failed to load dashboard');
+      alert('Failed to load dashboard');
     }
   };
 
-  // ✅ Chart handlers
+  // Chart handlers
   const handleAddChart = (chartType: ChartConfig['type']) => {
     const dataRows = (currentData as any)?.results || (currentData as any)?.data;
 
@@ -211,7 +211,7 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     if (selectedChart === chartId) setSelectedChart(null);
   };
 
-  // ✅ Filter handlers
+  // Filter handlers
   const handleAddFilter = (filter: Omit<FilterConfig, 'id'>) =>
     setFilters((prev) => [...prev, { ...filter, id: `filter-${Date.now()}` }]);
 
@@ -232,7 +232,7 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
   const handleDeleteFilter = (filterId: string) =>
     setFilters((prev) => prev.filter((f) => f.id !== filterId));
 
-  // ✅ Render content
+  // Render content
   const renderContent = () => {
     if (!activeDatasetId) {
       return (
