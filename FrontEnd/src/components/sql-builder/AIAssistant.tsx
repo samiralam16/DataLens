@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Send, Sparkles, Copy, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { generateSQL } from '../../services/api';
 
 interface AIAssistantProps {
   onQueryGenerated: (query: string) => void;
@@ -30,6 +31,7 @@ export function AIAssistant({ onQueryGenerated }: AIAssistantProps) {
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string>('');
 
   const predefinedQuestions = [
     "Show me monthly revenue trends",
@@ -52,80 +54,29 @@ export function AIAssistant({ onQueryGenerated }: AIAssistantProps) {
     setMessages(prev => [...prev, newUserMessage]);
     setInput('');
     setIsLoading(true);
+    setError('');
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse = generateAIResponse(userMessage);
-      const newAIMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: aiResponse.explanation,
-        query: aiResponse.query,
-        timestamp: new Date()
-      };
+    try {
+      const res = await generateSQL(userMessage);
+      if (res.success && res.sql_query) {
+        const newAIMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          type: 'assistant',
+          // descriptive text shown above the code block
+          content: `Below is the sql query for "${userMessage}"`,
+          // only this will be shown in the highlighted code block
+          query: res.sql_query,
+          timestamp: new Date()
+        };
 
-      setMessages(prev => [...prev, newAIMessage]);
+        setMessages(prev => [...prev, newAIMessage]);
+      } else {
+        setError(res.error || 'No SQL generated.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate SQL.');
+    } finally {
       setIsLoading(false);
-    }, 1500);
-  };
-
-  const generateAIResponse = (userInput: string): { explanation: string; query: string } => {
-    const input = userInput.toLowerCase();
-    
-    if (input.includes('revenue') && input.includes('month')) {
-      return {
-        explanation: "I'll create a query to show monthly revenue trends. This query groups sales data by month and calculates total revenue for each period.",
-        query: `SELECT 
-    DATE_TRUNC('month', order_date) as month,
-    SUM(total_amount) as monthly_revenue,
-    COUNT(*) as order_count
-FROM orders 
-WHERE order_date >= DATE_TRUNC('year', CURRENT_DATE)
-GROUP BY 1
-ORDER BY 1;`
-      };
-    } else if (input.includes('top') && input.includes('customer')) {
-      return {
-        explanation: "Here's a query to find your top customers by total sales amount. I've included customer details and their total purchase amounts.",
-        query: `SELECT 
-    c.customer_name,
-    c.email,
-    SUM(o.total_amount) as total_sales,
-    COUNT(o.id) as order_count
-FROM customers c
-JOIN orders o ON c.id = o.customer_id
-GROUP BY c.id, c.customer_name, c.email
-ORDER BY total_sales DESC
-LIMIT 10;`
-      };
-    } else if (input.includes('user') && input.includes('growth')) {
-      return {
-        explanation: "This query will show user growth by region, including new signups and growth rates compared to previous periods.",
-        query: `SELECT 
-    region,
-    COUNT(*) as total_users,
-    COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as new_users_30d,
-    ROUND(
-        COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) * 100.0 / 
-        NULLIF(COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '60 days' 
-                          AND created_at < CURRENT_DATE - INTERVAL '30 days' THEN 1 END), 0),
-        2
-    ) as growth_rate_percent
-FROM users
-GROUP BY region
-ORDER BY new_users_30d DESC;`
-      };
-    } else {
-      return {
-        explanation: "I'll create a general data overview query for you. This will give you a sample of your data structure and some basic statistics.",
-        query: `SELECT 
-    COUNT(*) as total_records,
-    MIN(created_at) as earliest_date,
-    MAX(created_at) as latest_date,
-    COUNT(DISTINCT user_id) as unique_users
-FROM your_table
-LIMIT 100;`
-      };
     }
   };
 
@@ -211,6 +162,15 @@ LIMIT 100;`
                     <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
                     <span className="text-sm">Generating SQL query...</span>
                   </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+          {error && (
+            <div className="flex justify-start">
+              <Card className="bg-red-100 text-red-800">
+                <CardContent className="p-3">
+                  <p className="text-sm">{error}</p>
                 </CardContent>
               </Card>
             </div>
