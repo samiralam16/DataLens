@@ -10,6 +10,26 @@ from utils import load_dataset, get_data_preview
 from typing import List
 from models import Snapshot
 from schema import SnapshotRequest, SnapshotResponse
+from pydantic import BaseModel
+from pinecone import Pinecone
+import google.generativeai as genai
+import requests
+import psycopg2
+import json
+import sys
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
+
+# Get environment variables
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
+
+# Configure Gemini
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 router = APIRouter()
 
@@ -166,3 +186,197 @@ async def list_all_sources(db: Session = Depends(get_db)):
 
     return {"sources": dataset_sources + snapshot_sources}
 
+def get_gemini_embedding(text):
+    """Generate embeddings using Gemini"""
+    response = genai.embed_content(
+        model="gemini-embedding-001",
+        content=text,
+        task_type="retrieval_document"
+    )
+    return response["embedding"]
+
+def search_relevant_schema(user_query, top_k=3, score_threshold=0.70):
+    """Search Pinecone for relevant schema"""
+    pc = Pinecone(api_key=PINECONE_API_KEY)
+    index = pc.Index(PINECONE_INDEX_NAME)
+
+    query_embedding = get_gemini_embedding(user_query)
+    results = index.query(vector=query_embedding, top_k=top_k, include_metadata=True)
+
+    return [match['metadata']['text'] for match in results['matches'] if match['score'] >= score_threshold]
+
+def generate_sql_query(user_query, relevant_schema):
+    """Call Gemini to generate SQL query"""
+    context = "\n\n".join(relevant_schema)
+    prompt = f"""
+        You are an expert PostgreSQL query generator. Your ONLY task is to analyze the provided database schema and generate a valid SQL query to answer the user question.
+
+        Instructions:
+        - DO NOT answer general questions, provide explanations, or respond outside your task.
+        - DO NOT include comments or special formatting characters like [.,\\,n,t] in the SQL.
+        - ONLY generate SQL if it is clearly supported by the schema.
+        - If the schema is missing or the question is irrelevant to the schema, do NOT generate SQL. Instead, return a clear reason in the "sql_query" field.
+        - You must always respond in the following JSON format:
+
+        {{
+        "token_usage": [number of tokens used in the response] : integer,
+        "cost": [estimated cost of the response in USD] : float ,
+        "tables_used": [list of relevant table names from the schema],
+        "filters": [list of conditions or filters used, if any],
+        "columns": [list of columns selected or referenced],
+        "sql_query": "SQL query. Otherwise, a reason such as: 'No schema provided to generate SQL query' or 'My capabilities are limited to generating SQL based only on the provided schema'"
+        }}
+
+        Schema:
+        {context}
+
+        User Question:
+        {user_query}
+    """
+
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+    headers = {"Content-Type": "application/json"}
+    params = {"key": GEMINI_API_KEY}
+    body = {
+        "contents": [{"parts": [{"text": prompt}]}]
+    }
+
+    response = requests.post(url, headers=headers, params=params, json=body)
+    response.raise_for_status()
+
+    candidates = response.json().get("candidates", [])
+    if not candidates:
+        return {"error": "No response from Gemini"}
+
+    content = candidates[0]['content']['parts'][0]['text']
+
+    # Clean up markdown code block
+    if content.startswith("```json") or content.startswith("```"):
+        content = content.strip("`")
+        content = content.replace("json", "", 1).strip()
+
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        return {"error": "Failed to parse Gemini response", "raw": content}
+
+def log_query_to_postgres(user_query, relevant_tables_with_scores, gemini_response):
+    """Log query to PostgreSQL database"""
+    try:
+        token_usage = gemini_response.get("token_usage")
+        cost = gemini_response.get("cost")
+        tables_used = gemini_response.get("tables_used", [])
+        filters = gemini_response.get("filters", [])
+        columns = gemini_response.get("columns", [])
+        sql_query = gemini_response.get("sql_query")
+
+        table_names = [item["table_name"] for item in relevant_tables_with_scores]
+        scores = [item["score"] for item in relevant_tables_with_scores]
+
+        conn = psycopg2.connect(
+            dbname=os.getenv("PG_DB"),
+            user=os.getenv("PG_USER"),
+            password=os.getenv("PG_PASSWORD"),
+            host=os.getenv("PG_HOST"),
+            port=os.getenv("PG_PORT")
+        )
+        cursor = conn.cursor()
+
+        insert_query = """
+            INSERT INTO query_logs (
+                user_query,
+                relevant_tables,
+                relevant_scores,
+                tables_used,
+                filters,
+                columns,
+                sql_query,
+                token_usage,
+                cost
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+
+        cursor.execute(insert_query, (
+            user_query,
+            table_names,
+            scores,
+            tables_used,
+            filters,
+            columns,
+            sql_query,
+            token_usage,
+            cost
+        ))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        print("Query log saved to PostgreSQL.", file=sys.stderr)
+    except Exception as e:
+        print(f"Failed to log query: {e}", file=sys.stderr)
+
+def process_user_query(user_query):
+    """Main function to process user query and return SQL"""
+    try:
+        pc = Pinecone(api_key=PINECONE_API_KEY)
+        index = pc.Index(PINECONE_INDEX_NAME)
+        query_embedding = get_gemini_embedding(user_query)
+        pinecone_results = index.query(vector=query_embedding, top_k=3, include_metadata=True)
+
+        relevant_schema = search_relevant_schema(user_query)
+        relevant_tables_with_scores = extract_table_scores_from_results(pinecone_results, score_threshold=0.70)
+        
+        result = generate_sql_query(user_query, relevant_schema)
+        
+        log_query_to_postgres(user_query, relevant_tables_with_scores, result)
+        
+        return {
+            "success": True,
+            "sql_query": result.get("sql_query"),
+            "error": result.get("error")
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+def extract_table_scores_from_results(results, score_threshold=0.70):
+    """
+    Extracts clean table names and their scores from Pinecone query results.
+
+    Args:
+        results (dict): Pinecone query results (with 'matches' list).
+        score_threshold (float): Minimum score to include.
+
+    Returns:
+        List of dicts with 'table_name' and 'score', where 'table_name' is cleaned.
+    """
+    def extract_table_name(table_str):
+        if not table_str:
+            return None
+        first_line = table_str.split("\n")[0]
+        if first_line.startswith("Table: "):
+            return first_line[len("Table: "):].strip()
+        return table_str
+
+    table_scores = []
+    for match in results.get('matches', []):
+        score = match.get('score', 0)
+        raw_table_name = match.get('metadata', {}).get('text', 'unknown_table')
+        if score >= score_threshold:
+            clean_table_name = extract_table_name(raw_table_name)
+            table_scores.append({"table_name": clean_table_name, "score": score})
+    return table_scores
+
+class QueryRequest(BaseModel):
+    user_query: str
+
+@router.post("/generate-sql")
+def generate_sql(request: QueryRequest):
+    result = process_user_query(request.user_query)
+    if result.get("success"):
+        return result
+    else:
+        raise HTTPException(status_code=500, detail=result.get("error", "Unknown error"))
