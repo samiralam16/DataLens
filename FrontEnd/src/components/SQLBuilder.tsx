@@ -12,6 +12,7 @@ import {
   ResizablePanelGroup,
 } from "./ui/resizable";
 import { useData } from "./DataContext";
+import { useSQL } from "./sql-builder/SQLContext";
 import { executeQuery } from "../services/api";
 import { toast } from "sonner";
 
@@ -35,7 +36,7 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
     setActiveModule,
   } = useData();
 
-  const [activeQuery, setActiveQuery] = useState("");
+  const { query: activeQuery, setQuery: setActiveQuery } = useSQL();
   const [queryResults, setQueryResults] = useState<any[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -157,11 +158,10 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
         {activeTab === "editor" && (
           <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
             <ResizablePanel defaultSize={60} minSize={30}>
-              <SQLEditor
-                onExecuteQuery={handleExecuteQuery}
-                isExecuting={isExecuting}
-                defaultQuery={activeQuery}
-              />
+               <SQLEditor
+                 onExecuteQuery={handleExecuteQuery}
+                 isExecuting={isExecuting}
+               />
             </ResizablePanel>
 
             <ResizableHandle />
@@ -184,7 +184,7 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
           </ResizablePanelGroup>
         )}
 
-        {activeTab === "import" && <DataImport onImport={handleImport} />}
+  {activeTab === "import" && <DataImport />}
         {activeTab === "saved" && (
           <SavedQueries
             goToEditor={() => {

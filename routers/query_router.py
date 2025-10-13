@@ -209,18 +209,29 @@ def generate_sql_query(user_query, relevant_schema):
     """Call Gemini to generate SQL query"""
     context = "\n\n".join(relevant_schema)
     prompt = f"""
-        You are an expert PostgreSQL query generator. Your ONLY task is to analyze the provided database schema and generate a valid SQL query to answer the user question.
+        You are an expert SQL query generator. Your ONLY task is to analyze the provided database schema and generate a valid SQL query to answer the user question.
+
+        Behavior:
+        - If no SQL dialect is specified, default to PostgreSQL.
+        - If a different SQL dialect is mentioned, use that.
 
         Instructions:
         - DO NOT answer general questions, provide explanations, or respond outside your task.
         - DO NOT include comments or special formatting characters like [.,\\,n,t] in the SQL.
         - ONLY generate SQL if it is clearly supported by the schema.
-        - If the schema is missing or the question is irrelevant to the schema, do NOT generate SQL. Instead, return a clear reason in the "sql_query" field.
-        - You must always respond in the following JSON format:
+        - If no schema is provided in the context, attempt to extract schema details from the user query (e.g., if the user says "schema: column1, column2" or mentions table/field names).
+        - If neither context nor user query includes a valid schema, or if the question is irrelevant to the schema, return a clear reason in the "sql_query" field.
+
+        Schema detection:
+        - First, check if the schema is provided in the 'Schema' section.
+        - If the 'Schema' section is empty or not provided, inspect the user question for any embedded schema or column/table definitions.
+        - If schema can be reasonably extracted from the user query, proceed to generate SQL based on that.
+
+        You must always respond in the following strict JSON format:
 
         {{
         "token_usage": [number of tokens used in the response] : integer,
-        "cost": [estimated cost of the response in USD] : float ,
+        "cost": [estimated cost of the response in USD] : float,
         "tables_used": [list of relevant table names from the schema],
         "filters": [list of conditions or filters used, if any],
         "columns": [list of columns selected or referenced],
@@ -232,7 +243,8 @@ def generate_sql_query(user_query, relevant_schema):
 
         User Question:
         {user_query}
-    """
+        """
+
 
     url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
     headers = {"Content-Type": "application/json"}
