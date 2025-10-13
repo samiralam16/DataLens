@@ -12,6 +12,7 @@ import {
   ResizablePanelGroup,
 } from "./ui/resizable";
 import { useData } from "./DataContext";
+import { useSQL } from "./sql-builder/SQLContext";
 import { executeQuery } from "../services/api";
 import { toast } from "sonner";
 
@@ -35,12 +36,19 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
     setActiveModule,
   } = useData();
 
-  const [activeQuery, setActiveQuery] = useState("");
+  const { query: activeQuery, setQuery: setActiveQuery } = useSQL();
   const [queryResults, setQueryResults] = useState<any[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "editor" | "import" | "saved" | "sources"
   >("editor");
+  const initialMessage = {
+    id: '1',
+    type: 'assistant',
+    content: "Hi! I'm your AI SQL assistant. I can help you write SQL queries using natural language. Try asking me something like 'Show me monthly revenue by region' or 'Find all users who signed up last month'.",
+    timestamp: new Date()
+  };
+  const [messages, setMessages] = useState([initialMessage]);
 
   // ✅ Mark SQL module active
   useEffect(() => {
@@ -157,11 +165,10 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
         {activeTab === "editor" && (
           <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
             <ResizablePanel defaultSize={60} minSize={30}>
-              <SQLEditor
-                onExecuteQuery={handleExecuteQuery}
-                isExecuting={isExecuting}
-                defaultQuery={activeQuery}
-              />
+               <SQLEditor
+                 onExecuteQuery={handleExecuteQuery}
+                 isExecuting={isExecuting}
+               />
             </ResizablePanel>
 
             <ResizableHandle />
@@ -184,7 +191,7 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
           </ResizablePanelGroup>
         )}
 
-        {activeTab === "import" && <DataImport onImport={handleImport} />}
+  {activeTab === "import" && <DataImport />}
         {activeTab === "saved" && (
           <SavedQueries
             goToEditor={() => {
@@ -211,13 +218,13 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
             }}
           />
         )}
-        {activeTool === "ai" && <AIAssistant onQueryGenerated={setActiveQuery} />}
+  {activeTool === "ai" && <AIAssistant onQueryGenerated={setActiveQuery} messages={messages} setMessages={setMessages} />}
         {activeTool === "sources" && <ConnectedSources />}
       </div>
 
       {showAIAssistant && (
         <div className="w-80 border-l border-border">
-          <AIAssistant onQueryGenerated={setActiveQuery} />
+          <AIAssistant onQueryGenerated={setActiveQuery} messages={messages} setMessages={setMessages} />
         </div>
       )}
     </div>

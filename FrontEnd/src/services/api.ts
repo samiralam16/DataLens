@@ -90,7 +90,7 @@ export interface PreviewResponse {
 export const getDatasetPreview = async (
   datasetId: number,
   limit: number = 50
-): Promise<PreviewResponse> => {
+):   Promise<PreviewResponse> => {
   const response = await fetch(
     `${API_BASE_URL}/api/data/${datasetId}/preview?limit=${limit}`
   );
@@ -314,3 +314,28 @@ export const loadDashboard = async (id: number): Promise<Dashboard> => {
   if (!res.ok) throw new Error("Failed to fetch dashboard");
   return res.json();
 };
+
+export type GenerateSqlResponse = {
+  success: boolean;
+  sql_query?: string;
+  error?: string;
+};
+
+export async function generateSQL(userQuery: string): Promise<GenerateSqlResponse> {
+  const url = `${API_BASE_URL}/query/generate-sql`;
+  console.debug("POST", url);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_query: userQuery }),
+  });
+
+  let data: any = null;
+  try { data = await res.json(); } catch { /* ignore */ }
+
+  if (!res.ok) {
+    const msg = data?.detail || data?.error || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data;
+}

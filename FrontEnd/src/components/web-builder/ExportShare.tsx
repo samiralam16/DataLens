@@ -34,7 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { FilterConfig } from "../WebBuilder";
 import { toast } from "sonner@2.0.3";
-import html2canvas from "html2canvas-pro";
+import html2canvas from "html2canvas";
 import {ChartConfig} from "../../services/api";
 import jsPDF from "jspdf";
 
