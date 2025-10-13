@@ -10,6 +10,8 @@ import { generateSQL } from '../../services/api';
 
 interface AIAssistantProps {
   onQueryGenerated: (query: string) => void;
+  messages: Message[];
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
 }
 
 interface Message {
@@ -20,7 +22,7 @@ interface Message {
   timestamp: Date;
 }
 
-export function AIAssistant({ onQueryGenerated }: AIAssistantProps) {
+export function AIAssistant({ onQueryGenerated, messages, setMessages }: AIAssistantProps) {
   const [input, setInput] = useState('');
   const initialMessage = {
     id: '1',
@@ -28,7 +30,6 @@ export function AIAssistant({ onQueryGenerated }: AIAssistantProps) {
     content: "Hi! I'm your AI SQL assistant. I can help you write SQL queries using natural language. Try asking me something like 'Show me monthly revenue by region' or 'Find all users who signed up last month'.",
     timestamp: new Date()
   };
-  const [messages, setMessages] = useState<Message[]>([initialMessage]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
 
@@ -101,7 +102,7 @@ export function AIAssistant({ onQueryGenerated }: AIAssistantProps) {
             Ask me to generate SQL queries in natural language
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setMessages([initialMessage])}>
+  <Button variant="outline" size="sm" onClick={() => setMessages([{ ...initialMessage, type: 'assistant' }])}>
           New Chat
         </Button>
       </div>

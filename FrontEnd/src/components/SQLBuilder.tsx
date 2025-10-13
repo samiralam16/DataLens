@@ -42,6 +42,13 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
   const [activeTab, setActiveTab] = useState<
     "editor" | "import" | "saved" | "sources"
   >("editor");
+  const initialMessage = {
+    id: '1',
+    type: 'assistant',
+    content: "Hi! I'm your AI SQL assistant. I can help you write SQL queries using natural language. Try asking me something like 'Show me monthly revenue by region' or 'Find all users who signed up last month'.",
+    timestamp: new Date()
+  };
+  const [messages, setMessages] = useState([initialMessage]);
 
   // ✅ Mark SQL module active
   useEffect(() => {
@@ -211,13 +218,13 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
             }}
           />
         )}
-        {activeTool === "ai" && <AIAssistant onQueryGenerated={setActiveQuery} />}
+  {activeTool === "ai" && <AIAssistant onQueryGenerated={setActiveQuery} messages={messages} setMessages={setMessages} />}
         {activeTool === "sources" && <ConnectedSources />}
       </div>
 
       {showAIAssistant && (
         <div className="w-80 border-l border-border">
-          <AIAssistant onQueryGenerated={setActiveQuery} />
+          <AIAssistant onQueryGenerated={setActiveQuery} messages={messages} setMessages={setMessages} />
         </div>
       )}
     </div>
