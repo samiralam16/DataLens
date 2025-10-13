@@ -91,13 +91,17 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     const dash = params.get("dashboard");
 
     if (tab === "webbuilder") setActiveTab("export");
-    if (dash) handleLoadFromDB(dash);
-  }, []);
 
-  // ✅ Fetch datasets on mount
+    if (dash && dataSources.length > 0) {
+      handleLoadFromDB(dash);
+    }
+  }, [dataSources.length]); // wait until datasets loaded
+
+  // ✅ Fetch datasets only once on mount
   useEffect(() => {
     refreshDatasets();
-  }, [refreshDatasets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const currentDataset = dataSources.find((ds) => ds.id === activeDatasetId) || null;
   const filteredRows = getActiveFilteredRows();
@@ -120,20 +124,17 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
         timestamp: new Date(),
       });
     }
-  }, [currentDataset, analyzedData, setAnalyzedData]);
+  }, [currentDataset?.id]); // simplified dependency
 
-  // ✅ Reset when no dataset
+  // ✅ Fix: Fetch dashboards only once per dataset (no infinite loop)
   useEffect(() => {
-    if (!activeDatasetId) {
-      setCharts([]);
-      setSelectedChart(null);
-      setAnalyzedData(null);
-      setDashboards([]);
-      return;
-    }
+    if (!activeDatasetId) return;
 
     const ds = dataSources.find((d) => d.id === activeDatasetId);
-    if (ds) {
+    if (!ds) return;
+
+    // Only update if changed
+    if (!analyzedData || analyzedData.sourceId !== ds.id) {
       setAnalyzedData({
         sourceId: ds.id,
         query: 'SELECT * FROM data',
@@ -141,10 +142,11 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
         columns: ds.columns,
         timestamp: new Date(),
       });
-      setCharts(getDashboard(ds.id));
-      fetchDashboards(ds.backendId);
     }
-  }, [activeDatasetId, dataSources]);
+
+    fetchDashboards(ds.backendId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDatasetId]); // ✅ removed dataSources from deps
 
   // ✅ Save dashboard persistently
   useEffect(() => {
@@ -246,10 +248,13 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
     setActiveTab('dashboard');
   };
 
-  const handleUpdateChart = (chartId: string, updates: Partial<ChartConfig>) => {
-    setCharts((prev) =>
-      prev.map((chart) => (chart.id === chartId ? { ...chart, ...updates } : chart))
-    );
+  const handleUpdateChart = (chartId: string, updates: Partial<ChartConfig>, mode?: 'preview' | 'apply' | 'cancel') => {
+    if (mode === 'apply') {
+      setCharts((prev) =>
+        prev.map((chart) => (chart.id === chartId ? { ...chart, ...updates } : chart))
+      );
+    }
+    // For preview/cancel, do nothing here!
   };
 
   const handleDeleteChart = (chartId: string) => {
@@ -335,12 +340,6 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
                 onAddFilter={handleAddFilter}
                 onUpdateFilter={handleUpdateFilter}
                 onDeleteFilter={handleDeleteFilter}
-                charts={charts}
-                selectedChart={selectedChart}
-                onSelectChart={setSelectedChart}
-                onAddChart={handleAddChart}
-                onUpdateChart={handleUpdateChart}
-                onDeleteChart={handleDeleteChart}
               />
             </ResizablePanel>
             <ResizableHandle />
@@ -428,7 +427,7 @@ export function WebBuilder({ addChartRef, activeTab, setActiveTab }: WebBuilderP
             Save
           </Button>
 
-          <Select onValueChange={(val) => handleLoadFromDB(Number(val))}>
+          <Select onValueChange={(val: string) => handleLoadFromDB(Number(val))}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Load Dashboard" />
             </SelectTrigger>

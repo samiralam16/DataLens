@@ -108,9 +108,10 @@ export function DashboardBuilder({
     mode?: 'preview' | 'apply' | 'cancel'
   ) => {
     if (mode === 'preview') {
+      // Only update tempEdits for preview
       setTempEdits(prev => ({ ...prev, [chartId]: { ...prev[chartId], ...updates } }));
-      onUpdateChart(chartId, updates, 'preview');
     } else if (mode === 'apply') {
+      // Apply changes: update main chart, clear tempEdits, update lastApplied
       const finalUpdates = { ...tempEdits[chartId], ...updates };
       onUpdateChart(chartId, finalUpdates, 'apply');
       setLastApplied(prev => ({
@@ -121,14 +122,15 @@ export function DashboardBuilder({
         const { [chartId]: _, ...rest } = prev;
         return rest;
       });
-    } else if (mode === 'cancel') {
+    } else if (mode === 'cancel' || mode === 'reset') {
+      // Restore last applied state, clear tempEdits
       if (lastApplied[chartId]) {
-        onUpdateChart(chartId, lastApplied[chartId], 'cancel');
+        setTempEdits(prev => {
+          const { [chartId]: _, ...rest } = prev;
+          return rest;
+        });
+        onUpdateChart(chartId, lastApplied[chartId], mode);
       }
-      setTempEdits(prev => {
-        const { [chartId]: _, ...rest } = prev;
-        return rest;
-      });
     }
   };
 
