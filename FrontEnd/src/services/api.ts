@@ -158,7 +158,24 @@ export const createSnapshot = async (
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ snapshot_name, sql_query }),
   });
-  if (!res.ok) throw new Error("Failed to create snapshot");
+
+  if (!res.ok) {
+    // Try to surface error details from backend
+    let message = "Failed to create snapshot";
+    try {
+      const data = await res.json();
+      message = data?.detail || data?.error || message;
+    } catch {
+      try {
+        const text = await res.text();
+        if (text) message = text;
+      } catch {
+        // ignore
+      }
+    }
+    throw new Error(message);
+  }
+
   return res.json();
 };
 

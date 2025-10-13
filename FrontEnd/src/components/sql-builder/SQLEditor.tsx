@@ -6,7 +6,7 @@ import { Badge } from "../ui/badge";
 import { Separator } from "../ui/separator";
 import { ScrollArea } from "../ui/scroll-area";
 import { Card } from "../ui/card";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { useSQL } from "./SQLContext";
 import { createSnapshot, listAllSources } from "../../services/api";
 
@@ -58,6 +58,12 @@ export function SQLEditor({ onExecuteQuery, isExecuting }: SQLEditorProps) {
       return;
     }
 
+    // Pre-validate: snapshot API only supports SELECT
+    if (!/^\s*select\b/i.test(query)) {
+      toast.error("Only SELECT queries can be saved as snapshots");
+      return;
+    }
+
     const snapshotName = prompt("Enter a name for this snapshot:");
     if (!snapshotName) {
       toast.error("Snapshot name is required");
@@ -68,9 +74,10 @@ export function SQLEditor({ onExecuteQuery, isExecuting }: SQLEditorProps) {
       await createSnapshot(snapshotName, query);
       toast.success("Query saved as snapshot");
       fetchSources(); // refresh list
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error saving snapshot", err);
-      toast.error("Failed to save snapshot");
+      const message = err?.message || "Failed to save snapshot";
+      toast.error(message);
     }
   };
 
