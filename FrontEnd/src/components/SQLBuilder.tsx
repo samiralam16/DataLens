@@ -42,25 +42,29 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
   const [activeTab, setActiveTab] = useState<
     "editor" | "import" | "saved" | "sources"
   >("editor");
-  const initialMessage = {
+  type AIMsg = { id: string; type: 'assistant' | 'user'; content: string; query?: string; timestamp: Date };
+  const initialMessage: AIMsg = {
     id: '1',
     type: 'assistant',
     content: "Hi! I'm your AI SQL assistant. I can help you write SQL queries using natural language. Try asking me something like 'Show me monthly revenue by region' or 'Find all users who signed up last month'.",
     timestamp: new Date()
   };
-  const [messages, setMessages] = useState([initialMessage]);
+  const [messages, setMessages] = useState<AIMsg[]>([initialMessage]);
 
   // ✅ Mark SQL module active
   useEffect(() => {
     setActiveModule("sql");
   }, [setActiveModule]);
 
-  // ✅ Preload query for selected dataset
+  // ✅ Preload query for selected dataset without overwriting user-entered SQL or query results
   useEffect(() => {
-    if (activeDatasetId) {
-      setActiveQuery(`SELECT * FROM "${activeDatasetId}" LIMIT 10;`);
-    }
-  }, [activeDatasetId]);
+    if (!activeDatasetId) return;
+    // Don't overwrite the editor when the active dataset is a transient query result
+    if (String(activeDatasetId).startsWith("query_result_")) return;
+    // Don't overwrite if the user already has something in the editor
+    if (activeQuery && activeQuery.trim().length > 0) return;
+    setActiveQuery(`SELECT * FROM "${activeDatasetId}" LIMIT 10;`);
+  }, [activeDatasetId, activeQuery, setActiveQuery]);
 
   // ✅ Infer column type
   const inferColumnType = (
@@ -209,7 +213,7 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
     <div className="h-full flex min-h-0 min-w-0">
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {activeTool === "editor" && renderEditor()}
-        {activeTool === "import" && <DataImport onImport={handleImport} />}
+  {activeTool === "import" && <DataImport />}
         {activeTool === "queries" && (
           <SavedQueries
             goToEditor={() => {
@@ -232,3 +236,4 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
 };
 
 export default SQLBuilder;
+ 
