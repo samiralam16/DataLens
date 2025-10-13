@@ -32,24 +32,25 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
 
   const handlePreview = (updates: Partial<ChartConfig>) => {
     setLocalChart(prev => normalizeChart({ ...prev, ...updates }));
+    onUpdateChart('preview', updates);
   };
 
   const handleApply = () => {
     const normalized = normalizeChart(localChart);
-    onUpdateChart("apply", normalized);
+    onUpdateChart('apply', normalized);
     if (onClose) onClose();
   };
 
   const handleReset = () => {
     const reset = normalizeChart(chart);
     setLocalChart(reset);
-    onUpdateChart("preview", reset);
+    onUpdateChart('preview', {});
   };
 
   const handleCancel = () => {
     const reset = normalizeChart(chart);
     setLocalChart(reset);
-    onUpdateChart("cancel", {});
+    onUpdateChart('cancel', {});
     if (onClose) onClose();
   };
 
@@ -135,7 +136,7 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
               <Label htmlFor="x-axis">X-Axis {localChart.type === 'pie' ? '(Categories)' : ''}</Label>
               <Select
                 value={localChart.x}
-                onValueChange={(value) => handlePreview({ x: value })}
+                onValueChange={(value: string) => handlePreview({ x: value })}
                 onBlur={() => onUpdateChart("apply", { x: localChart.x })}
               >
                 <SelectTrigger id="x-axis">
@@ -163,7 +164,7 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
               <Label htmlFor="y-axis">Y-Axis {localChart.type === 'pie' ? '(Values)' : ''}</Label>
               <Select
                 value={localChart.y}
-                onValueChange={(value) => handlePreview({ y: value })}
+                onValueChange={(value: string) => handlePreview({ y: value })}
                 onBlur={() => onUpdateChart("apply", { y: localChart.y })}
               >
                 <SelectTrigger id="y-axis">
@@ -200,7 +201,7 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
                 <Label>Width: {localChart.size.width}px</Label>
                 <Slider
                   value={[localChart.size.width]}
-                  onValueChange={([width]) => handlePreview({ size: { ...localChart.size, width } })}
+                  onValueChange={(value: number[]) => handlePreview({ size: { ...localChart.size, width: value[0] } })}
                   min={200}
                   max={800}
                   step={50}
@@ -210,8 +211,8 @@ export function ChartConfigPanel({ chart, onUpdateChart, onClose }: ChartConfigP
                 <Label>Height: {localChart.size.height}px</Label>
                 <Slider
                   value={[localChart.size.height]}
-                  onValueChange={([height]) => handlePreview({ size: { ...localChart.size, height } })}
-                  onValueCommit={([height]) => onUpdateChart("apply", { size: { ...localChart.size, height } })}
+                  onValueChange={(value: number[]) => handlePreview({ size: { ...localChart.size, height: value[0] } })}
+                  onValueCommit={(value: number[]) => onUpdateChart("apply", { size: { ...localChart.size, height: value[0] } })}
                   min={200}
                   max={600}
                   step={50}

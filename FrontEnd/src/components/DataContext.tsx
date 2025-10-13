@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import {
   Dataset,
   listDatasets,
@@ -146,7 +146,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const refreshDatasets = async () => {
+  const refreshDatasets = useCallback(async () => {
     setLoading(true);
     try {
       const backendDatasets = await listDatasets();
@@ -209,7 +209,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const addDataSource = (src: DataSource) => setDataSources((prev) => [...prev, src]);
   const updateDataSource = (id: string, partial: Partial<DataSource>) =>
