@@ -168,10 +168,10 @@ export function ResultsDisplay({
 
         {/* -------- TABLE VIEW -------- */}
         <TabsContent value="table" className="flex-1 min-h-0">
-  {/* This wrapper gets real scrollbars, regardless of parent overflow settings */}
-  {/* ✅ Scrollable in both directions */}
-        <div className="results-scroll h-full w-full relative">
-          <div className="overflow-x-auto overflow-y-auto w-fit min-w-full scrollbar-gutter-stable">
+          {/* Constrained scrollable container */}
+          <div className="h-full w-full relative rounded-md border overflow-hidden bg-card">
+            <div className="results-scroll h-full w-full">
+              <div className="overflow-x-auto overflow-y-auto w-fit min-w-full scrollbar-gutter-stable">
             <table className="min-w-max text-sm border-collapse">
               <thead className="bg-muted sticky top-0 z-10">
                 <tr>
@@ -200,8 +200,9 @@ export function ResultsDisplay({
                 ))}
               </tbody>
             </table>
+              </div>
+            </div>
           </div>
-        </div>
 
 </TabsContent>
 

@@ -144,7 +144,6 @@
 .h-full {
   min-width: 0;
   min-height: 0;
-  overflow: visible !important;
 }
 
 /* Keep overflow hidden only in controlled Radix areas */
@@ -170,7 +169,6 @@
   width: 100%;
   min-width: 100%;
   max-width: 100%;
-  max-height: 500px;
 }
 
 .results-scroll table {
@@ -179,12 +177,11 @@
   border-collapse: collapse;
 }
 
-/* Prevent parent overflow from clipping scroll */
+/* Prevent layout blowouts without overriding overflow behavior */
 .results-scroll,
 .results-scroll * {
   min-width: 0 !important;
   min-height: 0 !important;
-  overflow: visible !important;
 }
 
 /* Sticky header for all preview/data tables */

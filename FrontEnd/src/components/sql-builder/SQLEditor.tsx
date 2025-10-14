@@ -153,8 +153,8 @@ export function SQLEditor({ onExecuteQuery, isExecuting }: SQLEditorProps) {
       </div>
 
       {/* Sidebar for datasets + snapshots */}
-      <div className="w-80 border-l border-border bg-card">
-        <div className="border-b border-border p-4">
+      <div className="w-80 border-l border-border bg-card flex flex-col min-h-0 overflow-x-auto">
+        <div className="border-b border-border p-4 shrink-0">
           <h4 className="font-medium flex items-center gap-2">
             <Database className="h-4 w-4" />
             Available Datasets
@@ -163,8 +163,7 @@ export function SQLEditor({ onExecuteQuery, isExecuting }: SQLEditorProps) {
             Click on a dataset or snapshot to insert a query template
           </p>
         </div>
-
-        <ScrollArea className="h-full">
+        <ScrollArea className="flex-1 min-h-0 overflow-x-auto">
           <div className="p-4 space-y-3">
             {loading ? (
               <div className="text-center text-muted-foreground text-sm py-8">

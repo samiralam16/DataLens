@@ -211,7 +211,7 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
 
   return (
     <div className="h-full flex min-h-0 min-w-0">
-      <div className="flex-1 flex flex-col min-h-0 min-w-0">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative z-0">
         {activeTool === "editor" && renderEditor()}
   {activeTool === "import" && <DataImport />}
         {activeTool === "queries" && (
@@ -227,7 +227,7 @@ const SQLBuilder: React.FC<SQLBuilderProps> = ({
       </div>
 
       {showAIAssistant && (
-        <div className="w-80 border-l border-border">
+        <div className="w-80 border-l border-border relative z-10">
           <AIAssistant onQueryGenerated={setActiveQuery} messages={messages} setMessages={setMessages} />
         </div>
       )}
